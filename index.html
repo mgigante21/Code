@@ -179,6 +179,10 @@ button.wide:active{ opacity:.85; }
 .webcam-main .name{ flex:1; min-width:0; font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .webcam-main .dist{ font-size:11px; color:var(--text-faint); flex:none; }
 .webcam-map{ flex:none; font-size:15px; text-decoration:none; padding:5px 8px; border-radius:8px; background:var(--bg-alt); border:1px solid var(--card-border); }
+.webcam-thumb{ width:44px; height:33px; object-fit:cover; border-radius:6px; flex:none; background:var(--bg-alt); }
+.webcam-key-row{ display:flex; gap:6px; margin-top:10px; }
+.webcam-key-row input{ flex:1; }
+.webcam-key-status{ font-size:10.5px; color:var(--text-faint); margin-top:6px; }
 
 /* ---- warnings ---- */
 .warn-banner{ background:rgba(255,92,92,.12); border:1px solid var(--danger); color:#ffb3b3; border-radius:10px; padding:8px 10px; font-size:12.5px; margin-bottom:10px; }
@@ -307,6 +311,11 @@ footer a{ color:var(--accent-dim); }
       <span>Open full Windy map — live wind &amp; waves</span>
       <span class="arrow">→</span>
     </a>
+    <div class="webcam-key-row">
+      <input type="password" id="webcamKeyInput" placeholder="Windy Webcams API key (optional)" autocomplete="off">
+      <button class="iconbtn" id="webcamKeySave" aria-label="Save key">💾</button>
+    </div>
+    <div class="webcam-key-status" id="webcamKeyStatus"></div>
   </section>
 
   </div><!-- #cardStack -->
@@ -462,6 +471,7 @@ const state = {
   bestWindows: [],
   selectedDayIdx: 0,
   loading: false,
+  windyWebcams: null,   // real nearby webcams from Windy's API, if the user supplied a key (see WINDY_KEY_STORAGE)
 };
 
 /* ============================================================================
@@ -790,6 +800,30 @@ async function fetchUSGSNearby(lat, lon){
     }catch(e){ /* widen box */ }
   }
   return null;
+}
+
+// Optional: real nearby webcams via Windy's Webcams API (v3), only used when
+// the user has supplied their own key (see WINDY_KEY_STORAGE — the key lives
+// only in this browser's localStorage, never in the source file, since this
+// repo is public and a committed key would get scraped). Best-effort: this
+// endpoint's exact response shape couldn't be verified from this environment
+// (no network access here to test against it live), so field access is
+// defensive with fallbacks, and any failure just leaves state.windyWebcams
+// null so renderWebcams() falls back to the curated search-link list.
+async function fetchWindyWebcams(lat, lon, apiKey){
+  const radiusKm = 40;
+  const params = new URLSearchParams({ show: 'webcams:location,player,image,url', limit: '8' });
+  const url = `https://api.windy.com/api/webcams/v3/list/nearby=${lat.toFixed(4)},${lon.toFixed(4)},${radiusKm}?${params.toString()}`;
+  const res = await fetch(url, { headers: { 'x-windy-api-key': apiKey } });
+  if (!res.ok) throw new Error('Windy webcams API returned ' + res.status);
+  const j = await res.json();
+  const list = j.webcams || j.result?.webcams || [];
+  return list.map(w => ({
+    id: w.id,
+    title: w.title || w.name || 'Webcam',
+    thumb: w.image?.current?.thumbnail || w.image?.current?.icon || w.image?.current?.preview || null,
+    pageUrl: w.url?.current?.desktop || w.url || `https://www.windy.com/webcams/${w.id}`,
+  })).filter(w => w.id);
 }
 
 /* ============================================================================
@@ -1418,6 +1452,16 @@ function renderWeatherNow(){
 function renderWebcams(){
   const box = el('webcamList');
   if (!state.coords){ box.innerHTML=''; return; }
+
+  if (state.windyWebcams && state.windyWebcams.length){
+    box.innerHTML = state.windyWebcams.map(w => `
+      <a class="webcam-item webcam-real" href="${w.pageUrl}" target="_blank" rel="noopener">
+        ${w.thumb ? `<img class="webcam-thumb" src="${w.thumb}" alt="">` : ''}
+        <span class="webcam-main"><span class="name">${w.title}</span></span>
+      </a>`).join('');
+    return;
+  }
+
   const { lat, lon } = state.coords;
   const nearest = WEBCAM_SPOTS
     .map(s => ({ ...s, dist: haversineMi(lat,lon,s.lat,s.lon) }))
@@ -1434,6 +1478,29 @@ function renderWebcams(){
       <a class="webcam-map" href="${mapUrl}" target="_blank" rel="noopener" title="Live wind/wave map">🗺</a>
     </div>`;
   }).join('');
+}
+
+const WINDY_KEY_STORAGE = 'gigafish_windy_webcams_key';
+
+function renderWebcamKeyStatus(){
+  const status = el('webcamKeyStatus');
+  const key = localStorage.getItem(WINDY_KEY_STORAGE);
+  if (!key){ status.textContent = 'No key saved — showing search links instead of live thumbnails.'; return; }
+  if (state.windyWebcams) status.textContent = `🔑 Windy Webcams connected — ${state.windyWebcams.length} nearby.`;
+  else status.textContent = '🔑 Key saved, but the last lookup failed or found nothing nearby — showing search links instead.';
+}
+
+async function loadWebcamsFromWindy(){
+  const key = localStorage.getItem(WINDY_KEY_STORAGE);
+  if (!key || !state.coords){ state.windyWebcams = null; return; }
+  try{
+    const cams = await fetchWindyWebcams(state.coords.lat, state.coords.lon, key);
+    state.windyWebcams = cams.length ? cams : null;
+  }catch(e){
+    state.windyWebcams = null;
+  }
+  renderWebcams();
+  renderWebcamKeyStatus();
 }
 
 function renderStationSelect(){
@@ -1462,6 +1529,7 @@ function renderAll(){
   renderMoon();
   renderWindy();
   renderWebcams();
+  renderWebcamKeyStatus();
   el('lastUpdated').textContent = new Date().toLocaleTimeString();
 }
 
@@ -1473,6 +1541,7 @@ async function loadLocationData(lat, lon){
   state.loading = true;
   setStatus('Fetching location name…');
   reverseGeocode(lat,lon).then(label => { state.locationLabel = label; renderLocationLabel(); });
+  loadWebcamsFromWindy(); // best-effort, fire-and-forget — doesn't block the main render
 
   setStatus('Loading weather models…');
   const results = await Promise.allSettled([
@@ -1663,6 +1732,14 @@ function wireEvents(){
   el('boatLen').addEventListener('change', () => { recomputeAll(); renderAll(); });
 
   el('stationSelect').addEventListener('change', e => reloadTideStation(e.target.value));
+
+  el('webcamKeyInput').value = localStorage.getItem(WINDY_KEY_STORAGE) || '';
+  el('webcamKeySave').addEventListener('click', () => {
+    const val = el('webcamKeyInput').value.trim();
+    if (val) localStorage.setItem(WINDY_KEY_STORAGE, val);
+    else localStorage.removeItem(WINDY_KEY_STORAGE);
+    loadWebcamsFromWindy();
+  });
 
   el('bdClose').addEventListener('click', () => el('breakdownModal').classList.add('hidden'));
   el('breakdownModal').addEventListener('click', e => { if (e.target.id==='breakdownModal') e.currentTarget.classList.add('hidden'); });
