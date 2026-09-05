@@ -812,12 +812,16 @@ async function fetchUSGSNearby(lat, lon){
 // null so renderWebcams() falls back to the curated search-link list.
 async function fetchWindyWebcams(lat, lon, apiKey){
   const radiusKm = 40;
-  const params = new URLSearchParams({ show: 'webcams:location,player,image,url', limit: '8' });
-  const url = `https://api.windy.com/api/webcams/v3/list/nearby=${lat.toFixed(4)},${lon.toFixed(4)},${radiusKm}?${params.toString()}`;
+  const params = new URLSearchParams({
+    nearby: `${lat.toFixed(4)},${lon.toFixed(4)},${radiusKm}`,
+    show: 'webcams:location,player,image,url',
+    limit: '8',
+  });
+  const url = `https://api.windy.com/webcams/api/v3/webcams?${params.toString()}`;
   const res = await fetch(url, { headers: { 'x-windy-api-key': apiKey } });
   if (!res.ok) throw new Error('Windy webcams API returned ' + res.status);
   const j = await res.json();
-  const list = j.webcams || j.result?.webcams || [];
+  const list = j.result?.webcams || j.webcams || [];
   return list.map(w => ({
     id: w.id,
     title: w.title || w.name || 'Webcam',
