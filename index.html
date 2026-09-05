@@ -304,7 +304,8 @@ footer a{ color:var(--accent-dim); }
     </div>
   </section>
 
-  <section class="card" id="webcamCard" data-card-id="webcamCard">
+  <!-- Parked for now — not working as intended yet, revisit later. Code kept intact below, just hidden. -->
+  <section class="card hidden" id="webcamCard" data-card-id="webcamCard">
     <h2><span>📷 Webcams near you</span><span class="drag-handle" title="Drag to reorder">⠿</span></h2>
     <div id="webcamList"></div>
     <a class="windy-link" id="windyLink" href="#" target="_blank" rel="noopener">
@@ -1545,7 +1546,9 @@ async function loadLocationData(lat, lon){
   state.loading = true;
   setStatus('Fetching location name…');
   reverseGeocode(lat,lon).then(label => { state.locationLabel = label; renderLocationLabel(); });
-  loadWebcamsFromWindy(); // best-effort, fire-and-forget — doesn't block the main render
+  // Webcams card is parked (hidden) for now — see WEBCAM_SPOTS section — so
+  // skip firing this lookup rather than spend API quota on a hidden card.
+  // loadWebcamsFromWindy();
 
   setStatus('Loading weather models…');
   const results = await Promise.allSettled([
