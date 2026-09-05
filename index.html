@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1929">
+<title>GigaFish — South Florida Fishing Conditions</title>
+<meta name="description" content="Best-time-to-fish predictor for South Florida: weather models, tides, waves, and moon phase combined into one score.">
+
+<style>
+/* ==========================================================================
+   GIGAFISH — THEME
+   Single fixed dark "ocean" theme (deliberate, not adaptive) for outdoor
+   phone readability day or night. Edit the variables below to re-skin.
+   ========================================================================== */
+:root{
+  --bg:            #0a1929;
+  --bg-alt:        #0f2438;
+  --card:          #122b42;
+  --card-border:   #1e3f5c;
+  --text:          #eaf3fb;
+  --text-dim:      #9db4c9;
+  --text-faint:    #6f889d;
+  --accent:        #35c9e8;
+  --accent-dim:    #1c7f96;
+  --warn:          #ffb020;
+  --danger:        #ff5c5c;
+  --good:          #35d68a;
+  --shadow:        0 2px 10px rgba(0,0,0,.35);
+  --radius:        14px;
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; }
+body{
+  background: radial-gradient(1200px 600px at 50% -10%, #113250 0%, var(--bg) 55%);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:15px;
+  line-height:1.4;
+  min-height:100vh;
+  padding-bottom:28px;
+}
+#app{ max-width:520px; margin:0 auto; padding:0 12px; }
+
+/* ---- header ---- */
+.topbar{ display:flex; align-items:center; justify-content:space-between; padding:14px 2px 8px; }
+.topbar h1{ font-size:20px; margin:0; letter-spacing:.2px; }
+.topbar h1 span.tag{ display:block; font-size:10px; font-weight:400; color:var(--text-faint); letter-spacing:.5px; text-transform:uppercase; }
+.loc-row{ display:flex; align-items:center; gap:8px; max-width:60%; }
+#locLabel{ font-size:12.5px; color:var(--text-dim); text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.iconbtn{ background:var(--card); border:1px solid var(--card-border); color:var(--text); border-radius:10px; width:34px; height:34px; font-size:16px; flex:none; cursor:pointer; }
+.iconbtn:active{ transform:scale(.95); }
+
+/* ---- generic card/panel ---- */
+.card, .panel{
+  background:var(--card);
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:14px;
+  margin:10px 0;
+}
+.card h2{ font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--text-dim); margin:0 0 10px; display:flex; align-items:center; gap:6px; }
+.hidden{ display:none !important; }
+
+/* ---- location panel ---- */
+.quick-locs{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.chip{ background:var(--bg-alt); border:1px solid var(--card-border); color:var(--text); border-radius:999px; padding:6px 11px; font-size:12.5px; cursor:pointer; }
+.chip:active{ background:var(--accent-dim); }
+.manual-latlon{ display:flex; gap:6px; margin-bottom:10px; }
+.manual-latlon input{ flex:1; min-width:0; }
+input[type=number], input[type=text], select{
+  background:var(--bg-alt); border:1px solid var(--card-border); color:var(--text);
+  border-radius:8px; padding:8px 9px; font-size:14px; width:100%;
+}
+button.wide{ width:100%; padding:10px; border-radius:10px; border:1px solid var(--accent-dim); background:var(--accent-dim); color:#fff; font-size:14px; font-weight:600; cursor:pointer; }
+button.wide:active{ opacity:.85; }
+.stationRow{ display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12.5px; color:var(--text-dim); }
+.stationRow select{ flex:1; }
+
+/* ---- segmented control ---- */
+.segmented{ display:flex; background:var(--bg-alt); border:1px solid var(--card-border); border-radius:12px; padding:3px; gap:3px; }
+.segmented button{
+  flex:1; padding:9px 4px; border:none; background:transparent; color:var(--text-dim);
+  font-size:13px; font-weight:600; border-radius:9px; cursor:pointer;
+}
+.segmented button.active{ background:var(--accent); color:#04202a; }
+.segmented.small button{ font-size:12px; padding:7px 3px; }
+.mode-row, .hull-row{ margin:10px 0; }
+.hull-row{ display:flex; flex-direction:column; gap:8px; }
+.boatlen-label{ font-size:12.5px; color:var(--text-dim); display:flex; flex-direction:column; gap:4px; }
+.boatlen-label input[type=range]{ width:100%; accent-color:var(--accent); }
+
+/* ---- status ---- */
+.status{ text-align:center; font-size:13px; color:var(--text-dim); padding:10px; }
+.status.error{ color:var(--danger); }
+.spinner{ display:inline-block; width:14px; height:14px; border:2px solid var(--text-faint); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; margin-right:6px; vertical-align:-2px; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* ---- best windows ---- */
+.window-item{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--card-border); }
+.window-item:last-child{ border-bottom:none; }
+.window-rank{ font-size:18px; font-weight:800; color:var(--accent); width:22px; text-align:center; flex:none; }
+.window-info{ flex:1; min-width:0; }
+.window-info .when{ font-size:14px; font-weight:600; }
+.window-info .why{ font-size:11.5px; color:var(--text-dim); margin-top:2px; }
+.scorepill{
+  flex:none; min-width:42px; text-align:center; border-radius:10px; padding:6px 8px;
+  font-weight:800; font-size:13px; color:#04202a;
+}
+
+/* ---- daily outlook ---- */
+.day-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--card-border); cursor:pointer; }
+.day-row:last-child{ border-bottom:none; }
+.day-name{ width:64px; flex:none; font-size:13px; font-weight:600; }
+.day-name .sub{ display:block; font-size:10.5px; color:var(--text-faint); font-weight:400; }
+.day-meta{ flex:1; min-width:0; font-size:11px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.day-conf{ font-size:10px; padding:2px 6px; border-radius:6px; background:var(--bg-alt); color:var(--text-faint); flex:none; }
+
+/* ---- hourly strip ---- */
+.daytabs{ display:flex; gap:6px; margin-bottom:10px; }
+.daytabs button{ flex:1; padding:6px; border-radius:8px; border:1px solid var(--card-border); background:var(--bg-alt); color:var(--text-dim); font-size:12.5px; cursor:pointer; }
+.daytabs button.active{ background:var(--accent); color:#04202a; border-color:var(--accent); font-weight:700; }
+.hour-strip{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; }
+.hour-strip::-webkit-scrollbar{ height:4px; }
+.hour-strip::-webkit-scrollbar-thumb{ background:var(--card-border); border-radius:2px; }
+.hour-item{ flex:none; width:56px; text-align:center; background:var(--bg-alt); border:1px solid var(--card-border); border-radius:10px; padding:8px 4px; cursor:pointer; }
+.hour-item .t{ font-size:10.5px; color:var(--text-dim); }
+.hour-item .emoji{ font-size:18px; margin:4px 0; }
+.hour-item .s{ font-size:13px; font-weight:800; border-radius:7px; padding:2px 0; color:#04202a; }
+.hour-item.now{ border-color:var(--accent); }
+
+/* ---- tide chart ---- */
+#tideCanvas{ width:100%; height:150px; display:block; }
+.tide-legend{ display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-faint); margin-top:4px; }
+.tide-events{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.tide-tag{ background:var(--bg-alt); border:1px solid var(--card-border); border-radius:8px; padding:4px 8px; font-size:11px; color:var(--text-dim); }
+
+/* ---- moon card ---- */
+.moon-row{ display:flex; align-items:center; gap:14px; }
+#moonCanvas{ flex:none; width:64px; height:64px; }
+.moon-info{ flex:1; }
+.moon-info .phase-name{ font-size:15px; font-weight:700; }
+.moon-info .illum{ font-size:12px; color:var(--text-dim); }
+.solunar-next{ margin-top:10px; display:flex; gap:8px; }
+.solunar-pill{ flex:1; background:var(--bg-alt); border:1px solid var(--card-border); border-radius:10px; padding:8px; text-align:center; }
+.solunar-pill .lbl{ font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.4px; }
+.solunar-pill .val{ font-size:13px; font-weight:700; margin-top:2px; }
+
+/* ---- windy ---- */
+.windy-link{ display:flex; align-items:center; justify-content:space-between; gap:10px; text-decoration:none; color:var(--text); }
+.windy-link .arrow{ color:var(--accent); font-size:18px; }
+
+/* ---- warnings ---- */
+.warn-banner{ background:rgba(255,92,92,.12); border:1px solid var(--danger); color:#ffb3b3; border-radius:10px; padding:8px 10px; font-size:12.5px; margin-bottom:10px; }
+
+/* ---- modal / breakdown ---- */
+.modal{ position:fixed; inset:0; background:rgba(4,10,18,.72); z-index:50; display:flex; align-items:flex-end; justify-content:center; }
+.modal-sheet{ background:var(--card); border:1px solid var(--card-border); border-radius:18px 18px 0 0; width:100%; max-width:520px; padding:16px; max-height:80vh; overflow-y:auto; }
+.modal-sheet h3{ margin:0 0 4px; font-size:16px; }
+.modal-sheet .sub{ font-size:12px; color:var(--text-dim); margin-bottom:12px; }
+.breakdown-row{ margin-bottom:10px; }
+.breakdown-row .head{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:4px; }
+.breakdown-row .head .label{ color:var(--text); font-weight:600; }
+.breakdown-row .head .pts{ color:var(--text-dim); }
+.bar-bg{ background:var(--bg-alt); border-radius:6px; height:8px; overflow:hidden; }
+.bar-fill{ height:100%; border-radius:6px; }
+.breakdown-row .note{ font-size:11px; color:var(--text-faint); margin-top:3px; }
+.closebtn{ display:block; width:100%; margin-top:14px; padding:10px; border-radius:10px; border:1px solid var(--card-border); background:var(--bg-alt); color:var(--text); font-size:14px; cursor:pointer; }
+
+/* ---- footer ---- */
+footer{ text-align:center; font-size:10.5px; color:var(--text-faint); padding:18px 10px 6px; line-height:1.7; }
+footer a{ color:var(--accent-dim); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <h1>🎣 GigaFish<span class="tag">South FL fishing conditions</span></h1>
+    <div class="loc-row">
+      <span id="locLabel">Locating…</span>
+      <button class="iconbtn" id="locBtn" aria-label="Change location">📍</button>
+    </div>
+  </header>
+
+  <section class="panel hidden" id="locPanel">
+    <div class="quick-locs" id="quickLocs"></div>
+    <div class="manual-latlon">
+      <input id="manLat" type="number" step="0.0001" placeholder="Latitude">
+      <input id="manLon" type="number" step="0.0001" placeholder="Longitude">
+      <button class="iconbtn" id="manGoBtn" aria-label="Go">➜</button>
+    </div>
+    <button class="wide" id="gpsBtn">📡 Use my GPS location</button>
+  </section>
+
+  <section class="mode-row">
+    <div class="segmented" id="modeToggle">
+      <button data-mode="inshore" class="active">Inshore</button>
+      <button data-mode="offshore">Offshore</button>
+      <button data-mode="freshwater">Freshwater</button>
+    </div>
+  </section>
+
+  <section class="hull-row" id="hullRow">
+    <div class="segmented small" id="hullToggle">
+      <button data-hull="flat">Flat / Skiff</button>
+      <button data-hull="modv" class="active">Modified-V</button>
+      <button data-hull="deepv">Deep-V</button>
+    </div>
+    <label class="boatlen-label">Boat length: <b><span id="boatLenVal">22</span> ft</b>
+      <input id="boatLen" type="range" min="12" max="45" value="22">
+    </label>
+  </section>
+
+  <div class="status hidden" id="status"></div>
+  <div class="warn-banner hidden" id="warnBanner"></div>
+
+  <section class="card hidden" id="bestWindowsCard">
+    <h2>⭐ Best windows this week</h2>
+    <div id="bestWindowsList"></div>
+  </section>
+
+  <section class="card hidden" id="dailyCard">
+    <h2>📅 7-day outlook</h2>
+    <div id="dailyList"></div>
+  </section>
+
+  <section class="card hidden" id="hourlyCard">
+    <h2>⏱ Hour-by-hour</h2>
+    <div class="daytabs" id="dayTabs"></div>
+    <div class="hour-strip" id="hourStrip"></div>
+  </section>
+
+  <section class="card hidden" id="tideCard">
+    <h2>🌊 Tide — next 48h</h2>
+    <canvas id="tideCanvas" width="600" height="150"></canvas>
+    <div class="tide-legend"><span>now</span><span>+48h</span></div>
+    <div class="tide-events" id="tideEvents"></div>
+    <div class="stationRow" id="waterTempRow" style="display:none"></div>
+    <div class="stationRow">
+      <span>Station:</span>
+      <select id="stationSelect"></select>
+    </div>
+  </section>
+
+  <section class="card hidden" id="freshwaterCard">
+    <h2>🏞 Freshwater gauge (USGS)</h2>
+    <div id="usgsInfo" style="font-size:12.5px;color:var(--text-dim);"></div>
+  </section>
+
+  <section class="card" id="moonCard">
+    <h2>🌙 Moon &amp; solunar</h2>
+    <div class="moon-row">
+      <canvas id="moonCanvas" width="128" height="128"></canvas>
+      <div class="moon-info">
+        <div class="phase-name" id="moonPhaseName">—</div>
+        <div class="illum" id="moonIllum">—</div>
+      </div>
+    </div>
+    <div class="solunar-next">
+      <div class="solunar-pill"><div class="lbl">Next major</div><div class="val" id="nextMajor">—</div></div>
+      <div class="solunar-pill"><div class="lbl">Next minor</div><div class="val" id="nextMinor">—</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>📷 Live check</h2>
+    <a class="windy-link" id="windyLink" href="#" target="_blank" rel="noopener">
+      <span>Open Windy — live wind, waves &amp; webcams near you</span>
+      <span class="arrow">→</span>
+    </a>
+  </section>
+
+  <footer>
+    Weather: Open-Meteo multi-model (GFS · ECMWF · ICON · GEM · JMA) &middot;
+    Marine: Open-Meteo Marine &middot; Tides: NOAA CO-OPS &middot;
+    Freshwater: USGS Water Services &middot; Location: BigDataCloud<br>
+    Model guidance only — always use on-the-water judgment for safety.<br>
+    Last updated <span id="lastUpdated">—</span>
+  </footer>
+
+</div>
+
+<div class="modal hidden" id="breakdownModal">
+  <div class="modal-sheet">
+    <h3 id="bdTitle">—</h3>
+    <div class="sub" id="bdSub">—</div>
+    <div id="bdRows"></div>
+    <button class="closebtn" id="bdClose">Close</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   GIGAFISH — SOUTH FLORIDA FISHING CONDITIONS
+   Single-file, no-build, zero-API-key app. Deploy the folder as-is to Netlify.
+
+   Data sources (all free / keyless):
+     - Open-Meteo Forecast API (multi-model)   https://open-meteo.com
+     - Open-Meteo Marine API                   https://open-meteo.com
+     - NOAA CO-OPS Tides & Currents             https://api.tidesandcurrents.noaa.gov
+     - USGS Water Services (freshwater)         https://waterservices.usgs.gov
+     - BigDataCloud reverse geocoding           https://www.bigdatacloud.com
+     - Moon phase & solunar periods: computed client-side, no API.
+
+   File is organized top-to-bottom as:
+     CONFIG -> STATE -> UTIL -> ASTRO -> GEO -> FETCHERS -> SCORING -> RENDER -> INIT
+   ========================================================================== */
+
+/* ============================================================================
+   CONFIG — tune scoring weights and thresholds here
+   ========================================================================== */
+
+// Per-mode weight allocation. Each mode's weights must sum to 100.
+// Missing data for a factor degrades gracefully: its weight is redistributed
+// proportionally across whatever factors *do* have data for that hour,
+// rather than silently zeroing the score.
+const WEIGHTS = {
+  inshore:    { solunar: 25, pressure: 20, tide: 20, wind: 20, watertemp: 15 },
+  offshore:   { solunar: 20, pressure: 15, tide: 10, wind: 15, wave: 25, watertemp: 15 },
+  freshwater: { solunar: 30, pressure: 25, wind: 15, watertemp: 20, flow: 10 },
+};
+
+// Wind speed (mph) -> comfort/clarity subscore (0-1), piecewise-linear between anchors.
+const WIND_ANCHORS = [[0,1.0],[8,0.95],[12,0.8],[18,0.55],[24,0.3],[32,0.1],[45,0.02]];
+
+// Pressure 6h trend (hPa) -> subscore (0-1). Positive = rising.
+// Slow falls (pre-front) score best; sharp post-frontal rises score worst.
+const PRESSURE_TREND_ANCHORS = [
+  [-8, 0.55], [-3, 1.0], [-1, 0.85], [0, 0.72], [1, 0.55], [3, 0.35], [6, 0.18], [10, 0.08],
+];
+
+// Hull type -> base "comfortable ceiling" wave height in feet before a hard cap kicks in.
+// Boat length nudges this up/down slightly (see hullCeiling()).
+const HULL_BASE_CEILING_FT = { flat: 1.6, modv: 2.6, deepv: 4.0 };
+const HULL_LABELS = { flat: 'Flat-bottom / Skiff', modv: 'Modified-V', deepv: 'Deep-V' };
+
+// Water temp favorable bands (°F).
+const WATERTEMP_BANDS = {
+  salt: { good:[70,84], ok:[[58,70],[84,89]] },
+  fresh:{ good:[68,86], ok:[[58,68],[86,90]] },
+};
+
+// Model-agreement (confidence) thresholds: stdev at which agreement hits 0%.
+const AGREEMENT_PRESSURE_STDEV_ZERO = 3.0;  // hPa
+const AGREEMENT_WIND_STDEV_ZERO      = 9.0;  // mph
+
+const WEATHER_MODELS = ['gfs_seamless','ecmwf_ifs025','icon_seamless','gem_seamless','jma_seamless'];
+
+// NOAA CO-OPS tide stations spanning South Florida (Atlantic + Gulf sides + Keys).
+// Coordinates are approximate anchor points used only to pick the *nearest*
+// station to the user — the actual station list is user-overridable in the UI.
+// NOTE: verify/adjust IDs against https://tidesandcurrents.noaa.gov/stations.html
+// if a station ever returns no data; the app auto-falls-back to the next nearest.
+const TIDE_STATIONS = [
+  { id:'8722670', name:'Lake Worth Pier, FL',           lat:26.6112, lon:-80.0334 },
+  { id:'8723080', name:'Bakers Haulover Inlet, FL',     lat:25.9007, lon:-80.1223 },
+  { id:'8723170', name:'Miami Beach, FL',               lat:25.7683, lon:-80.1300 },
+  { id:'8723214', name:'Virginia Key, Biscayne Bay, FL',lat:25.7317, lon:-80.1617 },
+  { id:'8723970', name:'Vaca Key, FL',                  lat:24.7110, lon:-81.1058 },
+  { id:'8724580', name:'Key West, FL',                  lat:24.5557, lon:-81.8079 },
+  { id:'8725110', name:'Naples, FL',                    lat:26.1300, lon:-81.8069 },
+  { id:'8725520', name:'Fort Myers, FL',                lat:26.6459, lon:-81.8723 },
+];
+
+// Quick-pick locations for manual override.
+const QUICK_LOCATIONS = [
+  { name:'Fort Lauderdale', lat:26.1224, lon:-80.1373 },
+  { name:'Miami',           lat:25.7617, lon:-80.1918 },
+  { name:'West Palm Beach', lat:26.7153, lon:-80.0534 },
+  { name:'Key Largo',       lat:25.0865, lon:-80.4473 },
+  { name:'Islamorada',      lat:24.9277, lon:-80.6278 },
+  { name:'Marathon',        lat:24.7136, lon:-81.0937 },
+  { name:'Key West',        lat:24.5551, lon:-81.7800 },
+  { name:'Naples',          lat:26.1420, lon:-81.7948 },
+  { name:'Lake Okeechobee (Clewiston)', lat:26.7542, lon:-80.9331 },
+  { name:'Lake Okeechobee (Okeechobee)', lat:27.2436, lon:-80.8298 },
+  { name:'Everglades City', lat:25.8598, lon:-81.3787 },
+];
+
+/* ============================================================================
+   STATE
+   ========================================================================== */
+const state = {
+  mode: 'inshore',          // inshore | offshore | freshwater
+  hull: 'modv',              // flat | modv | deepv
+  boatLength: 22,
+  coords: null,              // {lat, lon}
+  locationLabel: null,
+  tzOffsetSeconds: 0,
+  tzName: null,
+  stationOverride: null,     // user-forced NOAA station id
+  weather: null,             // parsed multi-model hourly frame
+  marine: null,              // parsed marine hourly frame
+  tide: null,                // {events:[{t,type,heightFt}], curve:[{t,ft}], stationUsed}
+  usgs: null,                // {name, distanceMi, tempF, flowCfs, gageFt, levelTrend}
+  hours: [],                 // computed per-hour score objects across the fetched window
+  days: [],                  // computed per-day aggregates
+  bestWindows: [],
+  selectedDayIdx: 0,
+  loading: false,
+};
+
+/* ============================================================================
+   UTIL
+   ========================================================================== */
+const clamp = (v,lo,hi)=> Math.max(lo, Math.min(hi, v));
+const lerp = (a,b,t)=> a + (b-a)*t;
+
+function lerpTable(anchors, x){
+  if (x <= anchors[0][0]) return anchors[0][1];
+  for (let i=0;i<anchors.length-1;i++){
+    const [x0,y0]=anchors[i], [x1,y1]=anchors[i+1];
+    if (x>=x0 && x<=x1){ const t=(x-x0)/(x1-x0); return lerp(y0,y1,t); }
+  }
+  return anchors[anchors.length-1][1];
+}
+
+function mean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
+function stdev(arr){
+  if (arr.length<2) return 0;
+  const m=mean(arr);
+  return Math.sqrt(mean(arr.map(v=>(v-m)*(v-m))));
+}
+
+function haversineMi(lat1,lon1,lat2,lon2){
+  const R=3958.8, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R * 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function cToF(c){ return c*9/5+32; }
+
+function fmtHour(dateLikeLocalStr){
+  // dateLikeLocalStr: "YYYY-MM-DDTHH:mm" already in the location's local time.
+  const d = new Date(dateLikeLocalStr + 'Z'); // treat wall-clock string as the reference instant (see NOW-CLOCK note below)
+  let h = d.getUTCHours();
+  const ampm = h>=12 ? 'pm':'am';
+  h = h%12; if (h===0) h=12;
+  return `${h}${ampm}`;
+}
+function fmtDayLabel(dateStr, idx){
+  // dateStr: "YYYY-MM-DD"
+  const d = new Date(dateStr+'T12:00:00Z');
+  const wd = d.toLocaleDateString('en-US',{ weekday:'short', timeZone:'UTC' });
+  const md = d.toLocaleDateString('en-US',{ month:'short', day:'numeric', timeZone:'UTC' });
+  return { top: idx===0? 'Today' : idx===1? 'Tomorrow' : wd, sub: md };
+}
+function fmtClock(dateObjPseudo){
+  let h = dateObjPseudo.getUTCHours(), m = dateObjPseudo.getUTCMinutes();
+  const ampm = h>=12?'pm':'am';
+  h = h%12; if(h===0) h=12;
+  return `${h}:${String(m).padStart(2,'0')}${ampm}`;
+}
+function fmtRange(startPseudo, endPseudo){
+  return `${fmtClock(startPseudo)}–${fmtClock(endPseudo)}`;
+}
+
+// ----- "pseudo-UTC" clock trick --------------------------------------------
+// Open-Meteo (timezone=auto) returns wall-clock strings already localized to
+// the fishing location, e.g. "2026-09-06T14:00", with no UTC offset marker.
+// We parse those with a trailing "Z" so JS treats the *local wall-clock
+// numbers* as if they were UTC. As long as we build "now" the same way
+// (real UTC-now shifted by the location's utc_offset_seconds, then read with
+// getUTC* accessors), every comparison/arithmetic operation below stays
+// internally consistent without ever touching the browser's own timezone.
+function nowPseudo(){
+  return new Date(Date.now() + state.tzOffsetSeconds*1000);
+}
+function toPseudo(localWallClockStr){
+  return new Date(localWallClockStr + 'Z');
+}
+
+function scoreColor(score){
+  const hue = clamp(score,0,100) * 1.15; // 0=red .. ~115=green
+  return `hsl(${hue}, 72%, 46%)`;
+}
+function scoreEmoji(score){
+  if (score>=85) return '🔥';
+  if (score>=70) return '🎣';
+  if (score>=50) return '🙂';
+  if (score>=30) return '😐';
+  return '💤';
+}
+function confLabel(pct){
+  if (pct>=75) return { label:'High', cls:'high' };
+  if (pct>=45) return { label:'Med', cls:'med' };
+  return { label:'Low', cls:'low' };
+}
+
+/* ============================================================================
+   ASTRO — moon phase + solunar major/minor periods (computed, no API)
+
+   Moon phase uses the standard reference-new-moon + synodic-month method
+   (accurate to a few hours, plenty for phase/illumination display).
+
+   Solunar transit times use a deliberately simple but *real* astronomical
+   relationship rather than a full lunar ephemeris transcribed from memory
+   (too easy to get subtly wrong without a way to verify it here): at New
+   Moon the Moon transits the meridian at roughly local solar noon; each day
+   after that it transits ~48.8 minutes later, completing a full 24h cycle
+   every synodic month. Lower transit ("underfoot") is ~12h25m from upper
+   transit; moonrise/set are approximated a quarter lunar-day either side of
+   transit. Honest error budget: ~±15min from the equation of time, ~±20min
+   from using the timezone's standard meridian instead of exact longitude,
+   and up to ~±45-60min on rise/set from ignoring lunar declination at these
+   latitudes. That's why windows are shown as ranges (±1h major, ±30min
+   minor) rather than instants — consistent with how printed solunar tables
+   already work. Swap in a full ELP2000/VSOP87 ephemeris here later for
+   arc-minute precision if ever needed.
+   ========================================================================== */
+const SYNODIC_DAYS = 29.530588853;
+const KNOWN_NEW_MOON_JD = 2451550.1; // 2000-01-06 18:14 UTC
+const LUNAR_DAY_HOURS = 24 + 50/60;  // ~24h50m
+
+function toJulianDate(msEpoch){ return msEpoch/86400000 + 2440587.5; }
+
+function moonAgeDays(msEpoch){
+  const jd = toJulianDate(msEpoch);
+  let age = (jd - KNOWN_NEW_MOON_JD) % SYNODIC_DAYS;
+  if (age<0) age += SYNODIC_DAYS;
+  return age;
+}
+
+function moonPhaseInfo(msEpoch){
+  const age = moonAgeDays(msEpoch);
+  const frac = age / SYNODIC_DAYS;           // 0..1
+  const illum = (1 - Math.cos(2*Math.PI*frac)) / 2; // 0..1
+  const waxing = frac < 0.5;
+  const names = ['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous',
+                 'Full Moon','Waning Gibbous','Last Quarter','Waning Crescent'];
+  const idx = Math.floor(frac*8 + 0.5) % 8;
+  return { age, frac, illum, waxing, name: names[idx] };
+}
+
+// Days until nearest new or full moon (for the solunar "bonus near new/full").
+function daysToNearestExtreme(age){
+  const toNew  = Math.min(age, SYNODIC_DAYS-age);
+  const toFull = Math.abs(age - SYNODIC_DAYS/2);
+  return Math.min(toNew, toFull);
+}
+
+// Computes upper transit hour (in the location's local pseudo-clock, 0-24)
+// for the local calendar day whose noon instant is `localNoonPseudoMs`.
+function upperTransitLocalHour(localNoonPseudoMs){
+  const age = moonAgeDays(localNoonPseudoMs);
+  const offsetHours = (age / SYNODIC_DAYS) * 24; // 0..24, 0 at new moon
+  return (12 + offsetHours) % 24;
+}
+
+// Builds major/minor solunar windows for a range of local calendar days.
+// Returns arrays of {start,end,kind} in pseudo-clock Date objects.
+function computeSolunarWindows(dayStrings /* ['YYYY-MM-DD', ...] */){
+  const majors = [], minors = [];
+  const MS_H = 3600000;
+  dayStrings.forEach((ds) => {
+    const noon = toPseudo(ds + 'T12:00:00');
+    const upperH = upperTransitLocalHour(noon.getTime());
+    const dayStart = toPseudo(ds + 'T00:00:00');
+    const upper = new Date(dayStart.getTime() + upperH*MS_H);
+    const lowerA = new Date(upper.getTime() + (LUNAR_DAY_HOURS/2)*MS_H);
+    const lowerB = new Date(upper.getTime() - (LUNAR_DAY_HOURS/2)*MS_H);
+    const rise = new Date(upper.getTime() - (LUNAR_DAY_HOURS/4)*MS_H);
+    const set  = new Date(upper.getTime() + (LUNAR_DAY_HOURS/4)*MS_H);
+    [upper, lowerA, lowerB].forEach(t => {
+      majors.push({ start:new Date(t.getTime()-MS_H), end:new Date(t.getTime()+MS_H), center:t });
+    });
+    [rise, set].forEach(t => {
+      minors.push({ start:new Date(t.getTime()-30*60*1000), end:new Date(t.getTime()+30*60*1000), center:t });
+    });
+  });
+  return { majors, minors };
+}
+
+function isWithin(t, windows){
+  return windows.some(w => t>=w.start && t<=w.end);
+}
+
+/* ============================================================================
+   GEO — GPS + reverse geocoding (BigDataCloud, keyless)
+   ========================================================================== */
+function getGPS(timeoutMs=10000){
+  return new Promise((resolve,reject)=>{
+    if (!navigator.geolocation){ reject(new Error('Geolocation not supported')); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      err => reject(err),
+      { enableHighAccuracy:true, timeout:timeoutMs, maximumAge:60000 }
+    );
+  });
+}
+
+async function reverseGeocode(lat, lon){
+  try{
+    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('geocode failed');
+    const j = await res.json();
+    const parts = [j.locality, j.principalSubdivision].filter(Boolean);
+    return parts.join(', ') || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+  }catch(e){
+    return `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+  }
+}
+
+/* ============================================================================
+   FETCHERS
+   ========================================================================== */
+async function fetchWeather(lat, lon){
+  const params = new URLSearchParams({
+    latitude: lat, longitude: lon,
+    hourly: 'pressure_msl,wind_speed_10m,wind_direction_10m,cloud_cover,precipitation,temperature_2m',
+    models: WEATHER_MODELS.join(','),
+    past_days: '2',
+    forecast_days: '7',
+    timezone: 'auto',
+    wind_speed_unit: 'mph',
+  });
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
+  if (!res.ok) throw new Error('weather fetch failed');
+  return res.json();
+}
+
+async function fetchMarine(lat, lon){
+  const params = new URLSearchParams({
+    latitude: lat, longitude: lon,
+    hourly: 'wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_direction,sea_surface_temperature',
+    past_days: '1',
+    forecast_days: '7',
+    timezone: 'auto',
+    length_unit: 'imperial',
+  });
+  const res = await fetch(`https://marine-api.open-meteo.com/v1/marine?${params.toString()}`);
+  if (!res.ok) throw new Error('marine fetch failed');
+  return res.json();
+}
+
+function nearestStations(lat, lon){
+  return TIDE_STATIONS
+    .map(s => ({ ...s, dist: haversineMi(lat,lon,s.lat,s.lon) }))
+    .sort((a,b)=>a.dist-b.dist);
+}
+
+function noaaDateStr(d){
+  const y=d.getUTCFullYear(), m=String(d.getUTCMonth()+1).padStart(2,'0'), day=String(d.getUTCDate()).padStart(2,'0');
+  return `${y}${m}${day}`;
+}
+
+async function fetchTidePredictions(stationId){
+  const begin = new Date(); const end = new Date(Date.now()+9*86400000);
+  const params = new URLSearchParams({
+    station: stationId, product:'predictions', datum:'MLLW', time_zone:'lst_ldt',
+    units:'english', interval:'hilo', format:'json', application:'GigaFishApp',
+    begin_date: noaaDateStr(begin), end_date: noaaDateStr(end),
+  });
+  const res = await fetch(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params.toString()}`);
+  const j = await res.json();
+  if (!res.ok || j.error || !j.predictions) throw new Error('no tide predictions');
+  return j.predictions.map(p => ({ t:p.t, type:p.type==='H'?'high':'low', ft:parseFloat(p.v) }));
+}
+
+async function fetchWaterTemp(stationId){
+  try{
+    const params = new URLSearchParams({
+      station: stationId, product:'water_temperature', units:'english',
+      time_zone:'lst_ldt', format:'json', date:'latest', application:'GigaFishApp',
+    });
+    const res = await fetch(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params.toString()}`);
+    const j = await res.json();
+    if (!res.ok || j.error || !j.data || !j.data.length) return null;
+    const last = j.data[j.data.length-1];
+    return { f: parseFloat(last.v), t: last.t };
+  }catch(e){ return null; }
+}
+
+async function pickTideStationAndFetch(lat, lon){
+  const candidates = state.stationOverride
+    ? [TIDE_STATIONS.find(s=>s.id===state.stationOverride)].filter(Boolean)
+    : nearestStations(lat, lon);
+  for (const s of candidates){
+    try{
+      const preds = await fetchTidePredictions(s.id);
+      const wtemp = await fetchWaterTemp(s.id);
+      return { station:s, predictions:preds, waterTemp:wtemp };
+    }catch(e){ /* try next */ }
+  }
+  return null;
+}
+
+async function fetchUSGSNearby(lat, lon){
+  const boxes = [0.15, 0.4, 1.0];
+  for (const pad of boxes){
+    try{
+      const bbox = `${(lon-pad).toFixed(4)},${(lat-pad).toFixed(4)},${(lon+pad).toFixed(4)},${(lat+pad).toFixed(4)}`;
+      const params = new URLSearchParams({
+        format:'json', bBox: bbox, parameterCd:'00010,00060,00065', siteStatus:'active',
+      });
+      const res = await fetch(`https://waterservices.usgs.gov/nwis/iv/?${params.toString()}`);
+      if (!res.ok) continue;
+      const j = await res.json();
+      const series = j?.value?.timeSeries || [];
+      if (!series.length) continue;
+      const bySite = {};
+      series.forEach(ts => {
+        const siteName = ts.sourceInfo.siteName;
+        const siteLat = parseFloat(ts.sourceInfo.geoLocation.geogLocation.latitude);
+        const siteLon = parseFloat(ts.sourceInfo.geoLocation.geogLocation.longitude);
+        const code = ts.variable.variableCode[0].value;
+        const val = parseFloat(ts.values[0]?.value?.[0]?.value);
+        bySite[siteName] ??= { name:siteName, lat:siteLat, lon:siteLon, vals:{} };
+        if (!Number.isNaN(val)) bySite[siteName].vals[code] = val;
+      });
+      const sites = Object.values(bySite).map(s => ({ ...s, dist: haversineMi(lat,lon,s.lat,s.lon) }))
+        .sort((a,b)=>a.dist-b.dist);
+      if (sites.length){
+        const s = sites[0];
+        return {
+          name: s.name, distanceMi: s.dist,
+          tempF: s.vals['00010']!=null ? cToF(s.vals['00010']) : null,
+          flowCfs: s.vals['00060'] ?? null,
+          gageFt: s.vals['00065'] ?? null,
+        };
+      }
+    }catch(e){ /* widen box */ }
+  }
+  return null;
+}
+
+/* ============================================================================
+   DATA SHAPING — turn raw API responses into a flat per-hour array
+   ========================================================================== */
+function buildHourlyFrame(weatherJson, marineJson){
+  const times = weatherJson.hourly.time;
+  const tzOffset = weatherJson.utc_offset_seconds || 0;
+  const tzName = weatherJson.timezone;
+  const frame = times.map((t, i) => {
+    const pressures=[], winds=[], dirs=[], clouds=[], precs=[], temps=[];
+    WEATHER_MODELS.forEach(m => {
+      const p = weatherJson.hourly[`pressure_msl_${m}`]?.[i];
+      const w = weatherJson.hourly[`wind_speed_10m_${m}`]?.[i];
+      const d = weatherJson.hourly[`wind_direction_10m_${m}`]?.[i];
+      const c = weatherJson.hourly[`cloud_cover_${m}`]?.[i];
+      const pr = weatherJson.hourly[`precipitation_${m}`]?.[i];
+      const tp = weatherJson.hourly[`temperature_2m_${m}`]?.[i];
+      if (p!=null) pressures.push(p);
+      if (w!=null) winds.push(w);
+      if (d!=null) dirs.push(d);
+      if (c!=null) clouds.push(c);
+      if (pr!=null) precs.push(pr);
+      if (tp!=null) temps.push(tp);
+    });
+    return {
+      t, // local wall-clock string, e.g. "2026-09-06T14:00"
+      pressure: mean(pressures), pressureSpread: stdev(pressures),
+      windMph: mean(winds), windSpread: stdev(winds),
+      windDir: mean(dirs),
+      cloud: mean(clouds), precip: mean(precs),
+      airTempF: temps.length ? cToF(mean(temps)) : null,
+      waveFt: null, wavePeriodS: null, swellDir: null, sstF: null,
+    };
+  });
+
+  if (marineJson && marineJson.hourly){
+    const mTimes = marineJson.hourly.time;
+    const idxByTime = {}; mTimes.forEach((t,i)=>idxByTime[t]=i);
+    frame.forEach(h => {
+      const i = idxByTime[h.t];
+      if (i==null) return;
+      const wh = marineJson.hourly.wave_height?.[i];
+      const wp = marineJson.hourly.wave_period?.[i];
+      const sd = marineJson.hourly.swell_wave_direction?.[i];
+      const sst = marineJson.hourly.sea_surface_temperature?.[i];
+      h.waveFt = wh!=null ? wh : null; // length_unit=imperial already returns feet
+      h.wavePeriodS = wp!=null ? wp : null;
+      h.swellDir = sd!=null ? sd : null;
+      h.sstF = sst!=null ? cToF(sst) : null;
+    });
+  }
+  return { frame, tzOffset, tzName };
+}
+
+// Continuous tide height via cosine interpolation between consecutive hi/lo events.
+// Standard smooth-tide approximation; also yields "how fast is it moving" for scoring.
+function buildTideCurve(events){
+  const pts = events.map(e => ({ t: toPseudo(e.t.replace(' ','T')), ft: e.ft, type: e.type }))
+                    .sort((a,b)=>a.t-b.t);
+  const sampleEveryMin = 15;
+  const curve = [];
+  for (let i=0;i<pts.length-1;i++){
+    const a=pts[i], b=pts[i+1];
+    const spanMs = b.t - a.t;
+    for (let ms=0; ms<spanMs; ms += sampleEveryMin*60000){
+      const frac = ms/spanMs; // 0..1 between two extremes
+      const height = (a.ft+b.ft)/2 + (a.ft-b.ft)/2 * Math.cos(Math.PI*frac);
+      const rate = Math.sin(Math.PI*frac); // 0 at extremes, 1 at mid-tide (max movement)
+      curve.push({ t: new Date(a.t.getTime()+ms), ft: height, moveFrac: rate });
+    }
+  }
+  if (pts.length) curve.push({ t: pts[pts.length-1].t, ft: pts[pts.length-1].ft, moveFrac: 0 });
+  return curve;
+}
+
+function tideMoveFracAt(curve, tPseudo){
+  if (!curve || !curve.length) return null;
+  let closest = curve[0], bestDiff = Math.abs(curve[0].t - tPseudo);
+  for (const p of curve){
+    const diff = Math.abs(p.t - tPseudo);
+    if (diff < bestDiff){ bestDiff = diff; closest = p; }
+  }
+  return closest.moveFrac;
+}
+
+/* ============================================================================
+   SCORING
+   ========================================================================== */
+function subSolunar(t, solunar, moon){
+  let base = 0.3;
+  if (isWithin(t, solunar.majors)) base = 1.0;
+  else if (isWithin(t, solunar.minors)) base = 0.6;
+  const daysToExtreme = daysToNearestExtreme(moon.age);
+  const bonus = clamp(1 - daysToExtreme/2, 0, 1) * 0.15; // up to +0.15 within ~2 days of new/full
+  return clamp(base + bonus, 0, 1);
+}
+
+function subPressure(deltaHpa6h){
+  if (deltaHpa6h==null) return null;
+  return clamp(lerpTable(PRESSURE_TREND_ANCHORS, deltaHpa6h), 0, 1);
+}
+
+function subTide(moveFrac){
+  if (moveFrac==null) return null;
+  return clamp(moveFrac, 0, 1);
+}
+
+function subWind(windMph){
+  if (windMph==null) return null;
+  return clamp(lerpTable(WIND_ANCHORS, windMph), 0, 1);
+}
+
+function hullCeilingFt(hull, boatLengthFt){
+  const base = HULL_BASE_CEILING_FT[hull];
+  const lenMult = clamp(1 + (boatLengthFt-20)/100, 0.85, 1.3);
+  return base * lenMult;
+}
+
+function subWave(waveFt, hull, boatLengthFt){
+  if (waveFt==null) return { sub:null, hardCap:false, ceiling:null };
+  const ceiling = hullCeilingFt(hull, boatLengthFt);
+  if (waveFt > ceiling) return { sub:0.05, hardCap:true, ceiling };
+  const t = waveFt / ceiling; // 0..1
+  const sub = clamp(1 - 0.8*t, 0.2, 1); // 1.0 at flat calm, ~0.2 right at the ceiling
+  return { sub, hardCap:false, ceiling };
+}
+
+function bandScore(tempF, bands){
+  if (tempF==null) return null;
+  const [gLo,gHi] = bands.good;
+  if (tempF>=gLo && tempF<=gHi) return 1.0;
+  for (const [lo,hi] of bands.ok) if (tempF>=lo && tempF<=hi) return 0.65;
+  return 0.35;
+}
+
+function subWaterTemp(tempF, mode, sharpDropFlag){
+  const bands = mode==='freshwater' ? WATERTEMP_BANDS.fresh : WATERTEMP_BANDS.salt;
+  let sub = bandScore(tempF, bands);
+  if (sub==null) return null;
+  if (sharpDropFlag) sub *= 0.6;
+  return clamp(sub, 0, 1);
+}
+
+function subFlow(rain24hMm){
+  let sub;
+  if (rain24hMm==null) sub = 0.85;
+  else if (rain24hMm<=2) sub = 0.85;
+  else if (rain24hMm<=10) sub = 0.9;
+  else if (rain24hMm<=30) sub = 0.6;
+  else sub = 0.35;
+  return clamp(sub, 0, 1);
+}
+
+function agreementPct(pressureSpread, windSpread){
+  const pA = clamp(1 - (pressureSpread||0)/AGREEMENT_PRESSURE_STDEV_ZERO, 0, 1);
+  const wA = clamp(1 - (windSpread||0)/AGREEMENT_WIND_STDEV_ZERO, 0, 1);
+  return Math.round(((pA+wA)/2) * 100);
+}
+
+// Combine {key: subscore0to1 or null} with WEIGHTS[mode], redistributing
+// weight away from any factor whose data is missing this hour.
+function weightedComposite(weights, subs){
+  let usedWeight = 0, sum = 0;
+  const contributions = {};
+  Object.keys(weights).forEach(k => {
+    const s = subs[k];
+    if (s!=null){ usedWeight += weights[k]; sum += weights[k]*s; }
+  });
+  if (usedWeight===0) return { score:null, contributions };
+  const scale = 100/usedWeight; // renormalize so used weights sum to 100
+  Object.keys(weights).forEach(k => {
+    const s = subs[k];
+    if (s!=null){
+      const effectiveWeight = weights[k]*scale;
+      contributions[k] = { weight: Math.round(effectiveWeight*10)/10, sub:s, points: effectiveWeight*s };
+    }
+  });
+  const score = clamp(Math.round(sum*scale), 0, 100);
+  return { score, contributions };
+}
+
+const FACTOR_LABELS = {
+  solunar:   'Solunar / moon',
+  pressure:  'Pressure trend',
+  tide:      'Tide movement',
+  wind:      'Wind',
+  wave:      'Wave vs. hull',
+  watertemp: 'Water temp',
+  flow:      'Rain / flow',
+};
+
+function computeHourScore(h, ctx){
+  const { mode, hull, boatLength, solunar, tideCurve } = ctx;
+  const t = toPseudo(h.t.replace(' ','T'));
+  const moon = moonPhaseInfo(t.getTime());
+
+  const subs = {};
+  const notes = {};
+  const warnings = [];
+
+  subs.solunar = subSolunar(t, solunar, moon);
+  notes.solunar = isWithin(t,solunar.majors) ? 'Inside a major period' :
+                  isWithin(t,solunar.minors) ? 'Inside a minor period' : 'Outside solunar window';
+
+  subs.pressure = subPressure(h.pressureTrend6h);
+  notes.pressure = h.pressureTrend6h==null ? 'No trend data' :
+    h.pressureTrend6h < -1 ? `Falling ${Math.abs(h.pressureTrend6h).toFixed(1)} hPa/6h — pre-front feed` :
+    h.pressureTrend6h > 1 ? `Rising ${h.pressureTrend6h.toFixed(1)} hPa/6h — possible lockjaw` : 'Steady pressure';
+
+  if (mode!=='freshwater'){
+    const moveFrac = tideCurve ? tideMoveFracAt(tideCurve, t) : null;
+    subs.tide = subTide(moveFrac);
+    notes.tide = moveFrac==null ? 'No tide data' : moveFrac>0.7 ? 'Moving well' : moveFrac<0.2 ? 'Near slack tide' : 'Moderate movement';
+  }
+
+  subs.wind = subWind(h.windMph);
+  notes.wind = h.windMph==null ? 'No wind data' : `${Math.round(h.windMph)} mph`;
+
+  let waveInfo = null;
+  if (mode==='offshore'){
+    waveInfo = subWave(h.waveFt, hull, boatLength);
+    subs.wave = waveInfo.sub;
+    notes.wave = h.waveFt==null ? 'No wave data' : `${h.waveFt.toFixed(1)} ft seas (ceiling ~${waveInfo.ceiling?.toFixed(1)} ft for your boat)`;
+    if (waveInfo.hardCap) warnings.push(`Rough for your boat: ${h.waveFt.toFixed(1)} ft exceeds the comfortable ceiling for a ${HULL_LABELS[hull]}.`);
+  }
+
+  const tempSource = mode==='freshwater' ? (h.usgsTempF ?? h.airTempF) : (h.sstF ?? h.airTempF);
+  subs.watertemp = subWaterTemp(tempSource, mode, h.sharpTempDrop);
+  notes.watertemp = tempSource==null ? 'No temp data' : `${Math.round(tempSource)}°F${h.sharpTempDrop?' — sharp recent drop':''}`;
+
+  if (mode==='freshwater'){
+    subs.flow = subFlow(h.rain24hMm);
+    notes.flow = h.rain24hMm==null ? 'No rainfall data' : `${h.rain24hMm.toFixed(0)}mm rain / 24h`;
+  }
+
+  const weights = WEIGHTS[mode];
+  const { score, contributions } = weightedComposite(weights, subs);
+  let finalScore = score;
+
+  // Hard cap for rough seas vs. hull (spec: cap hard, don't just numerically penalize)
+  if (waveInfo?.hardCap) finalScore = Math.min(finalScore ?? 20, 20);
+
+  const confidence = agreementPct(h.pressureSpread, h.windSpread);
+
+  const breakdown = Object.keys(contributions).map(k => ({
+    key:k, label:FACTOR_LABELS[k], weight:contributions[k].weight,
+    sub:contributions[k].sub, points:contributions[k].points, note:notes[k],
+  })).sort((a,b)=>b.points-a.points);
+
+  return { t, score: finalScore, confidence, breakdown, warnings, moon, timeStr:h.t };
+}
+
+function precomputeTrends(frame){
+  // 6h pressure trend + 24h rainfall sum + sharp SST/air-temp drop flag
+  frame.forEach((h,i) => {
+    const j6 = i-6;
+    h.pressureTrend6h = (j6>=0 && frame[j6].pressure!=null && h.pressure!=null)
+      ? h.pressure - frame[j6].pressure : null;
+    const j24 = Math.max(0, i-24);
+    h.rain24hMm = frame.slice(j24, i+1).reduce((s,x)=>s+(x.precip||0), 0);
+    const refTempNow = h.sstF ?? h.airTempF;
+    const prev = frame[Math.max(0,i-24)];
+    const refTempPrev = prev ? (prev.sstF ?? prev.airTempF) : null;
+    h.sharpTempDrop = (refTempNow!=null && refTempPrev!=null) ? (refTempPrev-refTempNow) > 5 : false;
+  });
+}
+
+function groupByLocalDay(frame){
+  const byDay = {};
+  frame.forEach(h => {
+    const day = h.t.slice(0,10);
+    (byDay[day] ??= []).push(h);
+  });
+  return byDay;
+}
+
+function recomputeAll(){
+  if (!state.weather) return;
+  const frame = state.weather.frame.map(h => ({ ...h }));
+  precomputeTrends(frame);
+  if (state.mode==='freshwater' && state.usgs?.tempF!=null){
+    frame.forEach(h => { h.usgsTempF = state.usgs.tempF; }); // persisted "current" reading, honest approximation for the week
+  }
+  // NOAA CO-OPS water temp is an observed (not forecast) reading. Marine SST
+  // model data is preferred where it exists; this only fills the gaps —
+  // e.g. if the marine fetch failed but tides succeeded — using the same
+  // persisted-current-reading approximation as the freshwater USGS case.
+  if (state.mode!=='freshwater' && state.tide?.waterTemp?.f!=null){
+    frame.forEach(h => { if (h.sstF==null) h.sstF = state.tide.waterTemp.f; });
+  }
+
+  const allDayKeys = Object.keys(groupByLocalDay(frame)).sort();
+  const solunar = computeSolunarWindows(allDayKeys);
+  const tideCurve = state.tide?.curve || null;
+
+  const ctx = { mode: state.mode, hull: state.hull, boatLength: state.boatLength, solunar, tideCurve, usgs: state.usgs };
+  const allHours = frame.map(h => computeHourScore(h, ctx));
+  state.solunar = solunar;
+
+  // Group by full calendar day (including hours earlier today that already
+  // passed) so "Today" always shows the whole day rather than whatever sliver
+  // happens to remain — filtering by "day >= today" (not "hour >= now") avoids
+  // an off-by-one edge case right around local midnight where a lone leftover
+  // hour from yesterday could otherwise masquerade as a tiny "Today" bucket.
+  const now = nowPseudo();
+  const todayKey = now.toISOString().slice(0,10);
+  const byDay = {};
+  allHours.forEach(h => (byDay[h.timeStr.slice(0,10)] ??= []).push(h));
+  const dayKeys = Object.keys(byDay).filter(k => k >= todayKey).sort().slice(0,7);
+
+  state.days = dayKeys.map((day, idx) => {
+    const hs = byDay[day].filter(h=>h.score!=null);
+    const sorted = [...hs].sort((a,b)=>b.score-a.score);
+    const top = sorted.slice(0, Math.max(1, Math.ceil(sorted.length*0.4)));
+    const dailyScore = top.length ? Math.round(mean(top.map(h=>h.score))) : null;
+    const conf = hs.length ? Math.round(mean(hs.map(h=>h.confidence))) : null;
+    const peak = sorted[0] || null;
+    return { day, idx, hours: byDay[day], dailyScore, confidence: conf, peak };
+  });
+  state.hours = dayKeys.flatMap(day => byDay[day]);
+
+  // Best-windows and the "upcoming warnings" banner should only ever look
+  // forward from right now, even though the day buckets above include hours
+  // already past today.
+  const futureHours = allHours.filter(h => h.t >= new Date(now.getTime()-30*60000));
+  state.bestWindows = findBestWindows(futureHours);
+  state.upcomingHours = futureHours.slice(0,24);
+}
+
+function findBestWindows(hours, windowSize=3, topN=3){
+  const scored = hours.filter(h=>h.score!=null);
+  const windows = [];
+  for (let i=0; i<=scored.length-windowSize; i++){
+    const slice = scored.slice(i, i+windowSize);
+    const avg = mean(slice.map(h=>h.score));
+    windows.push({ start: slice[0].t, end: slice[slice.length-1].t, avg, hours: slice });
+  }
+  windows.sort((a,b)=>b.avg-a.avg);
+  const chosen = [];
+  for (const w of windows){
+    if (chosen.length>=topN) break;
+    const overlaps = chosen.some(c => w.start < c.end && w.end > c.start);
+    if (!overlaps) chosen.push(w);
+  }
+  return chosen;
+}
+
+/* ============================================================================
+   RENDER
+   ========================================================================== */
+const el = id => document.getElementById(id);
+
+function setStatus(msg, isError=false){
+  const s = el('status');
+  s.classList.remove('hidden');
+  s.classList.toggle('error', isError);
+  s.innerHTML = isError ? msg : `<span class="spinner"></span>${msg}`;
+}
+function clearStatus(){ el('status').classList.add('hidden'); }
+
+function renderQuickLocs(){
+  el('quickLocs').innerHTML = QUICK_LOCATIONS.map(l =>
+    `<button class="chip" data-lat="${l.lat}" data-lon="${l.lon}">${l.name}</button>`).join('');
+}
+
+function renderModeUI(){
+  document.querySelectorAll('#modeToggle button').forEach(b => b.classList.toggle('active', b.dataset.mode===state.mode));
+  document.querySelectorAll('#hullToggle button').forEach(b => b.classList.toggle('active', b.dataset.hull===state.hull));
+  el('hullRow').classList.toggle('hidden', state.mode==='freshwater');
+  el('tideCard').classList.toggle('hidden', state.mode==='freshwater' || !state.tide);
+  el('freshwaterCard').classList.toggle('hidden', state.mode!=='freshwater');
+}
+
+function renderWarnings(){
+  const warns = [];
+  (state.upcomingHours||[]).forEach(h => warns.push(...h.warnings));
+  const unique = [...new Set(warns)];
+  const box = el('warnBanner');
+  if (unique.length){ box.classList.remove('hidden'); box.innerHTML = unique.map(w=>`⚠️ ${w}`).join('<br>'); }
+  else box.classList.add('hidden');
+}
+
+function renderBestWindows(){
+  const card = el('bestWindowsCard');
+  if (!state.bestWindows.length){ card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  el('bestWindowsList').innerHTML = state.bestWindows.map((w,i) => {
+    const dayLabel = fmtDayLabel(w.start.toISOString().slice(0,10), dayIndexOf(w.start));
+    const topFactors = topFactorsFor(w.hours);
+    return `<div class="window-item">
+      <div class="window-rank">${i+1}</div>
+      <div class="window-info">
+        <div class="when">${dayLabel.top} ${fmtRange(w.start,w.end)}</div>
+        <div class="why">${topFactors}</div>
+      </div>
+      <div class="scorepill" style="background:${scoreColor(w.avg)}">${Math.round(w.avg)}</div>
+    </div>`;
+  }).join('');
+}
+
+function dayIndexOf(pseudoDate){
+  const ds = pseudoDate.toISOString().slice(0,10);
+  const idx = state.days.findIndex(d=>d.day===ds);
+  return idx<0?0:idx;
+}
+
+function topFactorsFor(hoursArr){
+  const totals = {};
+  hoursArr.forEach(h => h.breakdown.forEach(b => { totals[b.label]=(totals[b.label]||0)+b.points; }));
+  return Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([l])=>l).join(' + ');
+}
+
+function renderDaily(){
+  const card = el('dailyCard');
+  if (!state.days.length){ card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  el('dailyList').innerHTML = state.days.map(d => {
+    const lbl = fmtDayLabel(d.day, d.idx);
+    const c = confLabel(d.confidence||0);
+    const meta = d.peak ? `Peak ${fmtClock(d.peak.t)} · ${topFactorsFor([d.peak])}` : '—';
+    return `<div class="day-row" data-day="${d.day}">
+      <div class="day-name">${lbl.top}<span class="sub">${lbl.sub}</span></div>
+      <div class="day-meta">${meta}</div>
+      <div class="day-conf">${c.label}</div>
+      <div class="scorepill" style="background:${scoreColor(d.dailyScore||0)}">${d.dailyScore??'–'}</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.day-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const idx = state.days.findIndex(d=>d.day===row.dataset.day);
+      if (idx>=0 && idx<2){ state.selectedDayIdx = idx; renderHourly(); window.scrollTo({top: el('hourlyCard').offsetTop-10, behavior:'smooth'}); }
+    });
+  });
+}
+
+function renderDayTabs(){
+  const tabs = state.days.slice(0,2);
+  el('dayTabs').innerHTML = tabs.map((d,i) => {
+    const lbl = fmtDayLabel(d.day, d.idx);
+    return `<button data-idx="${i}" class="${i===state.selectedDayIdx?'active':''}">${lbl.top}</button>`;
+  }).join('');
+  document.querySelectorAll('#dayTabs button').forEach(b => {
+    b.addEventListener('click', () => { state.selectedDayIdx = +b.dataset.idx; renderHourly(); });
+  });
+}
+
+function renderHourly(){
+  const card = el('hourlyCard');
+  if (!state.days.length){ card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  renderDayTabs();
+  const day = state.days[state.selectedDayIdx];
+  if (!day){ el('hourStrip').innerHTML=''; return; }
+  const now = nowPseudo();
+  el('hourStrip').innerHTML = day.hours.map(h => {
+    const isNow = Math.abs(h.t-now) < 1800000;
+    return `<div class="hour-item ${isNow?'now':''}" data-t="${h.timeStr}">
+      <div class="t">${fmtHour(h.timeStr)}</div>
+      <div class="emoji">${scoreEmoji(h.score||0)}</div>
+      <div class="s" style="background:${scoreColor(h.score||0)}">${h.score??'–'}</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.hour-item').forEach(item => {
+    item.addEventListener('click', () => openBreakdown(item.dataset.t));
+  });
+}
+
+function openBreakdown(timeStr){
+  const h = state.hours.find(x=>x.timeStr===timeStr);
+  if (!h) return;
+  const day = toPseudo(timeStr).toISOString().slice(0,10);
+  const lbl = fmtDayLabel(day, dayIndexOf(toPseudo(timeStr)));
+  el('bdTitle').textContent = `${lbl.top} · ${fmtHour(timeStr)} — Score ${h.score}`;
+  const c = confLabel(h.confidence);
+  el('bdSub').textContent = `Model agreement: ${c.label} (${h.confidence}%)`;
+  el('bdRows').innerHTML = h.breakdown.map(b => `
+    <div class="breakdown-row">
+      <div class="head"><span class="label">${b.label}</span><span class="pts">${b.points.toFixed(0)} / ${b.weight.toFixed(0)} pts</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${(b.sub*100).toFixed(0)}%; background:${scoreColor(b.sub*100)}"></div></div>
+      <div class="note">${b.note}</div>
+    </div>`).join('') + (h.warnings.length ? `<div class="warn-banner">${h.warnings.map(w=>'⚠️ '+w).join('<br>')}</div>` : '');
+  el('breakdownModal').classList.remove('hidden');
+}
+
+function renderTideChart(){
+  const canvas = el('tideCanvas');
+  const card = el('tideCard');
+  if (state.mode==='freshwater' || !state.tide){ card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const now = nowPseudo();
+  const windowEnd = new Date(now.getTime()+48*3600000);
+  const pts = state.tide.curve.filter(p => p.t>=now && p.t<=windowEnd);
+  if (!pts.length){ return; }
+  const minFt = Math.min(...pts.map(p=>p.ft)), maxFt = Math.max(...pts.map(p=>p.ft));
+  const pad = 14;
+  const x = t => pad + ( (t-now)/(windowEnd-now) ) * (W-2*pad);
+  const y = ft => H-pad - ( (ft-minFt)/((maxFt-minFt)||1) ) * (H-2*pad);
+
+  ctx.strokeStyle = '#35c9e8'; ctx.lineWidth = 2.5; ctx.beginPath();
+  pts.forEach((p,i) => { const px=x(p.t), py=y(p.ft); i===0?ctx.moveTo(px,py):ctx.lineTo(px,py); });
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(53,201,232,.12)';
+  ctx.lineTo(x(pts[pts.length-1].t), H-pad); ctx.lineTo(x(pts[0].t), H-pad); ctx.closePath(); ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth=1.5; ctx.beginPath();
+  ctx.moveTo(x(now), pad); ctx.lineTo(x(now), H-pad); ctx.stroke();
+
+  const events = state.tide.events.map(e=>({...e, t:toPseudo(e.t.replace(' ','T'))})).filter(e=>e.t>=now && e.t<=windowEnd);
+  el('tideEvents').innerHTML = events.map(e =>
+    `<span class="tide-tag">${e.type==='high'?'▲ High':'▼ Low'} ${fmtClock(e.t)} · ${e.ft.toFixed(1)}ft</span>`).join('');
+
+  const wtRow = el('waterTempRow');
+  if (state.tide.waterTemp?.f!=null){
+    wtRow.style.display = '';
+    wtRow.innerHTML = `<span>🌡 Observed water temp:</span><b>${Math.round(state.tide.waterTemp.f)}°F</b>`;
+  } else {
+    wtRow.style.display = 'none';
+  }
+}
+
+function drawMoon(ctx, size, illum, waxing){
+  const r = size/2 - 4;
+  const cx = size/2, cy = size/2;
+  ctx.clearRect(0,0,size,size);
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle='#1c2f42'; ctx.fill();
+
+  // Standard "scale trick" for a moon-phase disk: draw a fixed lit-side
+  // semicircle (the true limb), then reuse the same arc squashed
+  // horizontally by x=cos(illum*pi) to trace the terminator back to the
+  // top pole. x>0 keeps the squashed arc bulging the same way as the limb
+  // (crescent, illum<0.5); x<0 flips it to bulge the other way, which
+  // encloses *more* than half the disk (gibbous, illum>0.5). x=0 collapses
+  // the terminator to a straight line (exact quarter moon).
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
+  ctx.translate(cx,cy);
+  if (!waxing) ctx.scale(-1,1);
+  const x = Math.cos(illum*Math.PI);
+  ctx.fillStyle = '#eef3d8';
+  ctx.beginPath();
+  ctx.moveTo(0,-r);
+  ctx.arc(0,0,r,-Math.PI/2,Math.PI/2,false);
+  ctx.scale(x,1);
+  ctx.arc(0,0,r,Math.PI/2,-Math.PI/2,true);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.strokeStyle='#2a4d6c'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+function renderMoon(){
+  const now = nowPseudo();
+  const info = moonPhaseInfo(now.getTime());
+  el('moonPhaseName').textContent = info.name;
+  el('moonIllum').textContent = `${Math.round(info.illum*100)}% illuminated`;
+  const canvas = el('moonCanvas');
+  drawMoon(canvas.getContext('2d'), canvas.width, info.illum, info.waxing);
+
+  if (state.solunar){
+    const allMajor = state.solunar.majors.map(w=>({...w,kind:'major'}));
+    const allMinor = state.solunar.minors.map(w=>({...w,kind:'minor'}));
+    const nextMajor = allMajor.filter(w=>w.center>=now).sort((a,b)=>a.center-b.center)[0];
+    const nextMinor = allMinor.filter(w=>w.center>=now).sort((a,b)=>a.center-b.center)[0];
+    el('nextMajor').textContent = nextMajor ? fmtClock(nextMajor.center) : '—';
+    el('nextMinor').textContent = nextMinor ? fmtClock(nextMinor.center) : '—';
+  }
+}
+
+function renderUSGS(){
+  const box = el('usgsInfo');
+  if (state.mode!=='freshwater'){ return; }
+  if (!state.usgs){ box.textContent = 'No nearby USGS gauge found — freshwater temp/flow context unavailable here.'; return; }
+  const u = state.usgs;
+  box.innerHTML = `<b>${u.name}</b> (${u.distanceMi.toFixed(1)} mi away)<br>
+    ${u.tempF!=null? `Water temp: ${Math.round(u.tempF)}°F<br>`:''}
+    ${u.flowCfs!=null? `Flow: ${Math.round(u.flowCfs)} cfs<br>`:''}
+    ${u.gageFt!=null? `Gage height: ${u.gageFt.toFixed(2)} ft`:''}`;
+}
+
+function renderWindy(){
+  if (!state.coords) return;
+  const { lat, lon } = state.coords;
+  el('windyLink').href = `https://www.windy.com/?${lat.toFixed(3)},${lon.toFixed(3)},10,i:pressure`;
+}
+
+function renderStationSelect(){
+  const sel = el('stationSelect');
+  if (!state.coords) return;
+  const ranked = nearestStations(state.coords.lat, state.coords.lon);
+  sel.innerHTML = ranked.map(s => `<option value="${s.id}">${s.name} (${s.dist.toFixed(0)} mi)</option>`).join('');
+  if (state.tide?.stationUsed) sel.value = state.tide.stationUsed.id;
+}
+
+function renderLocationLabel(){
+  el('locLabel').textContent = state.locationLabel || '—';
+}
+
+function renderAll(){
+  renderModeUI();
+  renderLocationLabel();
+  renderWarnings();
+  renderBestWindows();
+  renderDaily();
+  renderHourly();
+  renderTideChart();
+  renderStationSelect();
+  renderUSGS();
+  renderMoon();
+  renderWindy();
+  el('lastUpdated').textContent = new Date().toLocaleTimeString();
+}
+
+/* ============================================================================
+   MAIN LOAD PIPELINE
+   ========================================================================== */
+async function loadLocationData(lat, lon){
+  state.coords = { lat, lon };
+  state.loading = true;
+  setStatus('Fetching location name…');
+  reverseGeocode(lat,lon).then(label => { state.locationLabel = label; renderLocationLabel(); });
+
+  setStatus('Loading weather models…');
+  const results = await Promise.allSettled([
+    fetchWeather(lat, lon),
+    fetchMarine(lat, lon),
+    pickTideStationAndFetch(lat, lon),
+    state.mode==='freshwater' ? fetchUSGSNearby(lat, lon) : Promise.resolve(null),
+  ]);
+
+  const [weatherR, marineR, tideR, usgsR] = results;
+
+  if (weatherR.status==='fulfilled'){
+    const built = buildHourlyFrame(weatherR.value, marineR.status==='fulfilled'?marineR.value:null);
+    state.weather = built;
+    state.tzOffsetSeconds = built.tzOffset;
+    state.tzName = built.tzName;
+  } else {
+    setStatus('Weather data unavailable — check your connection and reload.', true);
+    state.loading = false;
+    return;
+  }
+
+  if (tideR.status==='fulfilled' && tideR.value){
+    const { station, predictions, waterTemp } = tideR.value;
+    state.tide = { stationUsed: station, events: predictions, curve: buildTideCurve(predictions), waterTemp };
+  } else {
+    state.tide = null;
+  }
+
+  if (usgsR.status==='fulfilled') state.usgs = usgsR.value;
+
+  recomputeAll();
+  clearStatus();
+  renderAll();
+  state.loading = false;
+}
+
+async function reloadTideStation(stationId){
+  if (!state.coords) return;
+  state.stationOverride = stationId;
+  setStatus('Reloading tide station…');
+  const tideR = await pickTideStationAndFetch(state.coords.lat, state.coords.lon);
+  if (tideR){
+    state.tide = { stationUsed: tideR.station, events: tideR.predictions, curve: buildTideCurve(tideR.predictions), waterTemp: tideR.waterTemp };
+    recomputeAll();
+  }
+  clearStatus();
+  renderAll();
+}
+
+async function reloadForModeChange(){
+  if (state.mode==='freshwater' && !state.usgs && state.coords){
+    setStatus('Loading USGS gauge…');
+    state.usgs = await fetchUSGSNearby(state.coords.lat, state.coords.lon);
+    clearStatus();
+  }
+  recomputeAll();
+  renderAll();
+}
+
+/* ============================================================================
+   INIT / EVENT WIRING
+   ========================================================================== */
+function wireEvents(){
+  renderQuickLocs();
+
+  el('locBtn').addEventListener('click', () => el('locPanel').classList.toggle('hidden'));
+
+  document.querySelectorAll('#quickLocs .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      el('locPanel').classList.add('hidden');
+      state.stationOverride = null;
+      loadLocationData(parseFloat(chip.dataset.lat), parseFloat(chip.dataset.lon));
+    });
+  });
+
+  el('manGoBtn').addEventListener('click', () => {
+    const lat = parseFloat(el('manLat').value), lon = parseFloat(el('manLon').value);
+    if (Number.isFinite(lat) && Number.isFinite(lon)){
+      el('locPanel').classList.add('hidden');
+      state.stationOverride = null;
+      loadLocationData(lat, lon);
+    }
+  });
+
+  el('gpsBtn').addEventListener('click', async () => {
+    setStatus('Getting GPS position…');
+    try{
+      const { lat, lon } = await getGPS();
+      el('locPanel').classList.add('hidden');
+      state.stationOverride = null;
+      loadLocationData(lat, lon);
+    }catch(e){
+      setStatus('Could not get GPS location. Use a quick-pick or enter lat/lon manually.', true);
+    }
+  });
+
+  document.querySelectorAll('#modeToggle button').forEach(b => {
+    b.addEventListener('click', () => { state.mode = b.dataset.mode; renderModeUI(); reloadForModeChange(); });
+  });
+  document.querySelectorAll('#hullToggle button').forEach(b => {
+    b.addEventListener('click', () => { state.hull = b.dataset.hull; renderModeUI(); recomputeAll(); renderAll(); });
+  });
+  el('boatLen').addEventListener('input', e => {
+    state.boatLength = +e.target.value; el('boatLenVal').textContent = state.boatLength;
+  });
+  el('boatLen').addEventListener('change', () => { recomputeAll(); renderAll(); });
+
+  el('stationSelect').addEventListener('change', e => reloadTideStation(e.target.value));
+
+  el('bdClose').addEventListener('click', () => el('breakdownModal').classList.add('hidden'));
+  el('breakdownModal').addEventListener('click', e => { if (e.target.id==='breakdownModal') e.currentTarget.classList.add('hidden'); });
+}
+
+async function init(){
+  wireEvents();
+  setStatus('Detecting your location…');
+  try{
+    const { lat, lon } = await getGPS(8000);
+    loadLocationData(lat, lon);
+  }catch(e){
+    // Default to Fort Lauderdale / Broward waters per spec, manual override always available.
+    setStatus('GPS unavailable — showing Fort Lauderdale. Tap 📍 to change location.', false);
+    loadLocationData(26.1224, -80.1373);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
