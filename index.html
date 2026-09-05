@@ -173,11 +173,12 @@ button.wide:active{ opacity:.85; }
 .weather-stat .sub{ font-size:11px; color:var(--text-dim); margin-top:1px; }
 
 /* ---- webcams ---- */
-.webcam-item{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--card-border); text-decoration:none; color:var(--text); }
+.webcam-item{ display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--card-border); }
 .webcam-item:last-child{ border-bottom:none; }
-.webcam-item .name{ flex:1; font-size:13.5px; font-weight:600; }
-.webcam-item .dist{ font-size:11px; color:var(--text-faint); }
-.webcam-item .arrow{ color:var(--accent); font-size:16px; flex:none; }
+.webcam-main{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; text-decoration:none; color:var(--text); }
+.webcam-main .name{ flex:1; min-width:0; font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.webcam-main .dist{ font-size:11px; color:var(--text-faint); flex:none; }
+.webcam-map{ flex:none; font-size:15px; text-decoration:none; padding:5px 8px; border-radius:8px; background:var(--bg-alt); border:1px solid var(--card-border); }
 
 /* ---- warnings ---- */
 .warn-banner{ background:rgba(255,92,92,.12); border:1px solid var(--danger); color:#ffb3b3; border-radius:10px; padding:8px 10px; font-size:12.5px; margin-bottom:10px; }
@@ -1408,8 +1409,12 @@ function renderWeatherNow(){
   `;
 }
 
-// Curated-landmark webcam picker (see WEBCAM_SPOTS above for why this
-// points at a Windy map per spot rather than a specific stream URL).
+// Curated-landmark webcam picker (see WEBCAM_SPOTS above for why there's no
+// direct stream URL here: no free keyless API returns one, and a hardcoded
+// guess could be wrong or go stale with no way to verify it). Tapping a spot
+// searches for whatever real live webcam currently exists there — more
+// reliable than a fixed link, since it can't rot — with a small map icon as
+// a secondary action for a live wind/wave check instead of an actual camera.
 function renderWebcams(){
   const box = el('webcamList');
   if (!state.coords){ box.innerHTML=''; return; }
@@ -1418,12 +1423,17 @@ function renderWebcams(){
     .map(s => ({ ...s, dist: haversineMi(lat,lon,s.lat,s.lon) }))
     .sort((a,b)=>a.dist-b.dist)
     .slice(0,5);
-  box.innerHTML = nearest.map(s => `
-    <a class="webcam-item" href="https://www.windy.com/?${s.lat.toFixed(3)},${s.lon.toFixed(3)},13" target="_blank" rel="noopener">
-      <span class="name">${s.name}</span>
-      <span class="dist">${s.dist.toFixed(0)} mi</span>
-      <span class="arrow">→</span>
-    </a>`).join('');
+  box.innerHTML = nearest.map(s => {
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(s.name + ', Florida live webcam')}`;
+    const mapUrl = `https://www.windy.com/?${s.lat.toFixed(3)},${s.lon.toFixed(3)},13`;
+    return `<div class="webcam-item">
+      <a class="webcam-main" href="${searchUrl}" target="_blank" rel="noopener">
+        <span class="name">${s.name}</span>
+        <span class="dist">${s.dist.toFixed(0)} mi</span>
+      </a>
+      <a class="webcam-map" href="${mapUrl}" target="_blank" rel="noopener" title="Live wind/wave map">🗺</a>
+    </div>`;
+  }).join('');
 }
 
 function renderStationSelect(){
