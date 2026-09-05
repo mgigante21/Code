@@ -60,8 +60,19 @@ body{
   padding:14px;
   margin:10px 0;
 }
-.card h2{ font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--text-dim); margin:0 0 10px; display:flex; align-items:center; gap:6px; }
+.card h2{ font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--text-dim); margin:0 0 10px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
 .hidden{ display:none !important; }
+
+/* ---- reorderable card stack (see DRAG-TO-REORDER in the script) ---- */
+#cardStack{ position:relative; }
+#cardStack .card{ touch-action:pan-y; }
+.drag-handle{
+  flex:none; cursor:grab; color:var(--text-faint); font-size:16px; line-height:1;
+  padding:6px 4px; margin:-6px -4px; touch-action:none; text-transform:none; letter-spacing:0;
+}
+.drag-handle:active{ cursor:grabbing; }
+#cardStack .card.dragging{ opacity:.55; box-shadow:0 8px 24px rgba(0,0,0,.5); z-index:5; }
+#cardStack .card.drag-placeholder{ border-style:dashed; border-color:var(--accent-dim); background:transparent; box-shadow:none; }
 
 /* ---- location panel ---- */
 .quick-locs{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
@@ -114,7 +125,9 @@ button.wide:active{ opacity:.85; }
 .day-row:last-child{ border-bottom:none; }
 .day-name{ width:64px; flex:none; font-size:13px; font-weight:600; }
 .day-name .sub{ display:block; font-size:10.5px; color:var(--text-faint); font-weight:400; }
-.day-meta{ flex:1; min-width:0; font-size:11px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.day-meta{ flex:1; min-width:0; font-size:11px; color:var(--text-dim); }
+.day-meta .primary{ font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.day-meta .secondary{ font-size:10px; color:var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
 .day-conf{ font-size:10px; padding:2px 6px; border-radius:6px; background:var(--bg-alt); color:var(--text-faint); flex:none; }
 
 /* ---- hourly strip ---- */
@@ -124,10 +137,11 @@ button.wide:active{ opacity:.85; }
 .hour-strip{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; }
 .hour-strip::-webkit-scrollbar{ height:4px; }
 .hour-strip::-webkit-scrollbar-thumb{ background:var(--card-border); border-radius:2px; }
-.hour-item{ flex:none; width:56px; text-align:center; background:var(--bg-alt); border:1px solid var(--card-border); border-radius:10px; padding:8px 4px; cursor:pointer; }
+.hour-item{ flex:none; width:64px; text-align:center; background:var(--bg-alt); border:1px solid var(--card-border); border-radius:10px; padding:8px 4px; cursor:pointer; }
 .hour-item .t{ font-size:10.5px; color:var(--text-dim); }
 .hour-item .emoji{ font-size:18px; margin:4px 0; }
 .hour-item .s{ font-size:13px; font-weight:800; border-radius:7px; padding:2px 0; color:#04202a; }
+.hour-item .temp{ font-size:10px; color:var(--text-dim); margin-top:5px; white-space:nowrap; }
 .hour-item.now{ border-color:var(--accent); }
 
 /* ---- tide chart ---- */
@@ -150,6 +164,20 @@ button.wide:active{ opacity:.85; }
 /* ---- windy ---- */
 .windy-link{ display:flex; align-items:center; justify-content:space-between; gap:10px; text-decoration:none; color:var(--text); }
 .windy-link .arrow{ color:var(--accent); font-size:18px; }
+
+/* ---- current weather ---- */
+.weather-now{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.weather-stat{ background:var(--bg-alt); border:1px solid var(--card-border); border-radius:10px; padding:10px; }
+.weather-stat .lbl{ font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.4px; }
+.weather-stat .val{ font-size:18px; font-weight:700; margin-top:2px; }
+.weather-stat .sub{ font-size:11px; color:var(--text-dim); margin-top:1px; }
+
+/* ---- webcams ---- */
+.webcam-item{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--card-border); text-decoration:none; color:var(--text); }
+.webcam-item:last-child{ border-bottom:none; }
+.webcam-item .name{ flex:1; font-size:13.5px; font-weight:600; }
+.webcam-item .dist{ font-size:11px; color:var(--text-faint); }
+.webcam-item .arrow{ color:var(--accent); font-size:16px; flex:none; }
 
 /* ---- warnings ---- */
 .warn-banner{ background:rgba(255,92,92,.12); border:1px solid var(--danger); color:#ffb3b3; border-radius:10px; padding:8px 10px; font-size:12.5px; margin-bottom:10px; }
@@ -216,24 +244,31 @@ footer a{ color:var(--accent-dim); }
   <div class="status hidden" id="status"></div>
   <div class="warn-banner hidden" id="warnBanner"></div>
 
-  <section class="card hidden" id="bestWindowsCard">
-    <h2>⭐ Best windows this week</h2>
+  <div id="cardStack">
+
+  <section class="card" id="weatherCard" data-card-id="weatherCard">
+    <h2><span>🌤 Current weather</span><span class="drag-handle" title="Drag to reorder">⠿</span></h2>
+    <div class="weather-now" id="weatherNow"></div>
+  </section>
+
+  <section class="card hidden" id="bestWindowsCard" data-card-id="bestWindowsCard">
+    <h2><span>⭐ Best windows this week</span><span class="drag-handle" title="Drag to reorder">⠿</span></h2>
     <div id="bestWindowsList"></div>
   </section>
 
-  <section class="card hidden" id="dailyCard">
-    <h2>📅 7-day outlook</h2>
+  <section class="card hidden" id="dailyCard" data-card-id="dailyCard">
+    <h2><span>📅 7-day outlook</span><span class="drag-handle" title="Drag to reorder">⠿</span></h2>
     <div id="dailyList"></div>
   </section>
 
-  <section class="card hidden" id="hourlyCard">
-    <h2>⏱ Hour-by-hour</h2>
+  <section class="card hidden" id="hourlyCard" data-card-id="hourlyCard">
+    <h2><span>⏱ Hour-by-hour</span><span class="drag-handle" title="Drag to reorder">⠿</span></h2>
     <div class="daytabs" id="dayTabs"></div>
     <div class="hour-strip" id="hourStrip"></div>
   </section>
 
-  <section class="card hidden" id="tideCard">
-    <h2>🌊 Tide — next 48h</h2>
+  <section class="card hidden" id="tideCard" data-card-id="tideCard">
+    <h2><span>🌊 Tide — next 48h</span><span class="drag-handle" title="Drag to reorder">⠿</span></h2>
     <canvas id="tideCanvas" width="600" height="150"></canvas>
     <div class="tide-legend"><span>now</span><span>+48h</span></div>
     <div class="tide-events" id="tideEvents"></div>
@@ -244,13 +279,13 @@ footer a{ color:var(--accent-dim); }
     </div>
   </section>
 
-  <section class="card hidden" id="freshwaterCard">
-    <h2>🏞 Freshwater gauge (USGS)</h2>
+  <section class="card hidden" id="freshwaterCard" data-card-id="freshwaterCard">
+    <h2><span>🏞 Freshwater gauge (USGS)</span><span class="drag-handle" title="Drag to reorder">⠿</span></h2>
     <div id="usgsInfo" style="font-size:12.5px;color:var(--text-dim);"></div>
   </section>
 
-  <section class="card" id="moonCard">
-    <h2>🌙 Moon &amp; solunar</h2>
+  <section class="card" id="moonCard" data-card-id="moonCard">
+    <h2><span>🌙 Moon &amp; solunar</span><span class="drag-handle" title="Drag to reorder">⠿</span></h2>
     <div class="moon-row">
       <canvas id="moonCanvas" width="128" height="128"></canvas>
       <div class="moon-info">
@@ -264,13 +299,16 @@ footer a{ color:var(--accent-dim); }
     </div>
   </section>
 
-  <section class="card">
-    <h2>📷 Live check</h2>
+  <section class="card" id="webcamCard" data-card-id="webcamCard">
+    <h2><span>📷 Webcams near you</span><span class="drag-handle" title="Drag to reorder">⠿</span></h2>
+    <div id="webcamList"></div>
     <a class="windy-link" id="windyLink" href="#" target="_blank" rel="noopener">
-      <span>Open Windy — live wind, waves &amp; webcams near you</span>
+      <span>Open full Windy map — live wind &amp; waves</span>
       <span class="arrow">→</span>
     </a>
   </section>
+
+  </div><!-- #cardStack -->
 
   <footer>
     Weather: Open-Meteo multi-model (GFS · ECMWF · ICON · GEM · JMA) &middot;
@@ -379,6 +417,29 @@ const QUICK_LOCATIONS = [
   { name:'Everglades City', lat:25.8598, lon:-81.3787 },
 ];
 
+// Well-known South Florida inlets/piers/marinas — the kind of spot that
+// tends to have a public webcam somewhere (a marina's own cam, a local news
+// station, a community stream). There's no free keyless "webcam directory"
+// API, so rather than hardcode specific stream URLs (which rot and can't be
+// verified from here), each entry links to a Windy map centered on that spot
+// — Windy's own map surfaces community webcam pins for well-covered areas.
+// Edit freely if you have a direct cam link you'd rather point at instead.
+const WEBCAM_SPOTS = [
+  { name:'Haulover Inlet',        lat:25.9007, lon:-80.1223 },
+  { name:'Government Cut, Miami', lat:25.7647, lon:-80.1300 },
+  { name:'Port Everglades Inlet', lat:26.0928, lon:-80.1101 },
+  { name:'Bahia Mar, Fort Lauderdale', lat:26.1131, lon:-80.1084 },
+  { name:'Boynton Inlet',         lat:26.5442, lon:-80.0347 },
+  { name:'Jupiter Inlet',         lat:26.9481, lon:-80.0731 },
+  { name:'Sebastian Inlet',       lat:27.8597, lon:-80.4478 },
+  { name:'Bakers Haulover Beach', lat:25.9036, lon:-80.1231 },
+  { name:'Islamorada',            lat:24.9277, lon:-80.6278 },
+  { name:'Key West, Mallory Sq.', lat:24.5612, lon:-81.8075 },
+  { name:'Naples Pier',           lat:26.1297, lon:-81.8069 },
+  { name:'Fort Myers Beach',      lat:26.4526, lon:-81.9506 },
+  { name:'Clewiston, Lake Okeechobee', lat:26.7542, lon:-80.9331 },
+];
+
 /* ============================================================================
    STATE
    ========================================================================== */
@@ -432,6 +493,8 @@ function haversineMi(lat1,lon1,lat2,lon2){
 }
 
 function cToF(c){ return c*9/5+32; }
+const COMPASS_DIRS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+function compassDir(deg){ return deg==null ? '' : COMPASS_DIRS[Math.round(deg/22.5)%16]; }
 
 function fmtHour(dateLikeLocalStr){
   // dateLikeLocalStr: "YYYY-MM-DDTHH:mm" already in the location's local time.
@@ -976,7 +1039,12 @@ function computeHourScore(h, ctx){
     sub:contributions[k].sub, points:contributions[k].points, note:notes[k],
   })).sort((a,b)=>b.points-a.points);
 
-  return { t, score: finalScore, confidence, breakdown, warnings, moon, timeStr:h.t };
+  return {
+    t, score: finalScore, confidence, breakdown, warnings, moon, timeStr:h.t,
+    // raw display fields (not scoring inputs) for the weather/hourly UI
+    airTempF: h.airTempF, precipMm: h.precip, windMph: h.windMph, windDir: h.windDir,
+    cloud: h.cloud, waveFt: h.waveFt,
+  };
 }
 
 function precomputeTrends(frame){
@@ -1044,7 +1112,11 @@ function recomputeAll(){
     const dailyScore = top.length ? Math.round(mean(top.map(h=>h.score))) : null;
     const conf = hs.length ? Math.round(mean(hs.map(h=>h.confidence))) : null;
     const peak = sorted[0] || null;
-    return { day, idx, hours: byDay[day], dailyScore, confidence: conf, peak };
+    const temps = byDay[day].map(h=>h.airTempF).filter(v=>v!=null);
+    const hiF = temps.length ? Math.round(Math.max(...temps)) : null;
+    const loF = temps.length ? Math.round(Math.min(...temps)) : null;
+    const rainMm = byDay[day].reduce((s,h)=>s+(h.precipMm||0), 0);
+    return { day, idx, hours: byDay[day], dailyScore, confidence: conf, peak, hiF, loF, rainMm };
   });
   state.hours = dayKeys.flatMap(day => byDay[day]);
 
@@ -1146,10 +1218,12 @@ function renderDaily(){
   el('dailyList').innerHTML = state.days.map(d => {
     const lbl = fmtDayLabel(d.day, d.idx);
     const c = confLabel(d.confidence||0);
-    const meta = d.peak ? `Peak ${fmtClock(d.peak.t)} · ${topFactorsFor([d.peak])}` : '—';
+    const peakMeta = d.peak ? `Peak ${fmtClock(d.peak.t)} · ${topFactorsFor([d.peak])}` : '—';
+    const tempMeta = (d.hiF!=null && d.loF!=null) ? `${d.loF}–${d.hiF}°F` : '';
+    const rainMeta = d.rainMm>0.5 ? ` · 💧${(d.rainMm/25.4).toFixed(2)}"` : '';
     return `<div class="day-row" data-day="${d.day}">
       <div class="day-name">${lbl.top}<span class="sub">${lbl.sub}</span></div>
-      <div class="day-meta">${meta}</div>
+      <div class="day-meta"><div class="primary">${tempMeta}${rainMeta}</div><div class="secondary">${peakMeta}</div></div>
       <div class="day-conf">${c.label}</div>
       <div class="scorepill" style="background:${scoreColor(d.dailyScore||0)}">${d.dailyScore??'–'}</div>
     </div>`;
@@ -1183,10 +1257,13 @@ function renderHourly(){
   const now = nowPseudo();
   el('hourStrip').innerHTML = day.hours.map(h => {
     const isNow = Math.abs(h.t-now) < 1800000;
+    const temp = h.airTempF!=null ? `${Math.round(h.airTempF)}°` : '–';
+    const rain = h.precipMm>0.1 ? `💧${(h.precipMm/25.4).toFixed(2)}"` : '';
     return `<div class="hour-item ${isNow?'now':''}" data-t="${h.timeStr}">
       <div class="t">${fmtHour(h.timeStr)}</div>
       <div class="emoji">${scoreEmoji(h.score||0)}</div>
       <div class="s" style="background:${scoreColor(h.score||0)}">${h.score??'–'}</div>
+      <div class="temp">${temp}${rain ? ' '+rain : ''}</div>
     </div>`;
   }).join('');
   document.querySelectorAll('.hour-item').forEach(item => {
@@ -1316,6 +1393,39 @@ function renderWindy(){
   el('windyLink').href = `https://www.windy.com/?${lat.toFixed(3)},${lon.toFixed(3)},10,i:pressure`;
 }
 
+function renderWeatherNow(){
+  const box = el('weatherNow');
+  const now = nowPseudo();
+  const h = state.hours.find(x => Math.abs(x.t-now) < 1800000) || state.hours[0];
+  if (!h){ box.innerHTML = ''; return; }
+  const next6 = state.hours.filter(x => x.t>=now && x.t<=new Date(now.getTime()+6*3600000));
+  const rain6In = next6.reduce((s,x)=>s+(x.precipMm||0),0) / 25.4;
+  box.innerHTML = `
+    <div class="weather-stat"><div class="lbl">Temp</div><div class="val">${h.airTempF!=null?Math.round(h.airTempF)+'°F':'–'}</div></div>
+    <div class="weather-stat"><div class="lbl">Rain, next 6h</div><div class="val">${rain6In.toFixed(2)}"</div><div class="sub">${rain6In>0.02?'wet stretch ahead':'looking dry'}</div></div>
+    <div class="weather-stat"><div class="lbl">Wind</div><div class="val">${h.windMph!=null?Math.round(h.windMph)+' mph':'–'}</div><div class="sub">${compassDir(h.windDir)}</div></div>
+    <div class="weather-stat"><div class="lbl">Cloud cover</div><div class="val">${h.cloud!=null?Math.round(h.cloud)+'%':'–'}</div></div>
+  `;
+}
+
+// Curated-landmark webcam picker (see WEBCAM_SPOTS above for why this
+// points at a Windy map per spot rather than a specific stream URL).
+function renderWebcams(){
+  const box = el('webcamList');
+  if (!state.coords){ box.innerHTML=''; return; }
+  const { lat, lon } = state.coords;
+  const nearest = WEBCAM_SPOTS
+    .map(s => ({ ...s, dist: haversineMi(lat,lon,s.lat,s.lon) }))
+    .sort((a,b)=>a.dist-b.dist)
+    .slice(0,5);
+  box.innerHTML = nearest.map(s => `
+    <a class="webcam-item" href="https://www.windy.com/?${s.lat.toFixed(3)},${s.lon.toFixed(3)},13" target="_blank" rel="noopener">
+      <span class="name">${s.name}</span>
+      <span class="dist">${s.dist.toFixed(0)} mi</span>
+      <span class="arrow">→</span>
+    </a>`).join('');
+}
+
 function renderStationSelect(){
   const sel = el('stationSelect');
   if (!state.coords) return;
@@ -1332,6 +1442,7 @@ function renderAll(){
   renderModeUI();
   renderLocationLabel();
   renderWarnings();
+  renderWeatherNow();
   renderBestWindows();
   renderDaily();
   renderHourly();
@@ -1340,6 +1451,7 @@ function renderAll(){
   renderUSGS();
   renderMoon();
   renderWindy();
+  renderWebcams();
   el('lastUpdated').textContent = new Date().toLocaleTimeString();
 }
 
@@ -1414,6 +1526,87 @@ async function reloadForModeChange(){
 /* ============================================================================
    INIT / EVENT WIRING
    ========================================================================== */
+/* ============================================================================
+   DRAG-TO-REORDER — lets the user rearrange the content cards (e.g. "put
+   Tide up top"). Implemented with Pointer Events (not native HTML5 drag,
+   which mobile Safari/Chrome handle poorly for touch) so the same code path
+   covers mouse and touch. Order is persisted in localStorage per-browser.
+   ========================================================================== */
+const CARD_ORDER_KEY = 'gigafish_card_order_v1';
+
+function loadCardOrder(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(CARD_ORDER_KEY) || '[]');
+    return Array.isArray(saved) ? saved : [];
+  }catch(e){ return []; } // private-browsing / storage disabled — reordering just won't persist
+}
+
+function saveCardOrder(){
+  try{
+    const order = [...el('cardStack').children].map(c => c.dataset.cardId);
+    localStorage.setItem(CARD_ORDER_KEY, JSON.stringify(order));
+  }catch(e){ /* ignore — same graceful degradation as loadCardOrder */ }
+}
+
+function applyCardOrder(){
+  const stack = el('cardStack');
+  const saved = loadCardOrder();
+  if (!saved.length) return;
+  const byId = {};
+  [...stack.children].forEach(c => { byId[c.dataset.cardId] = c; });
+  // Re-append in saved order; any card not present in the saved list (e.g. a
+  // new feature added after the user last customized their layout) simply
+  // keeps its original relative position at the end.
+  saved.forEach(id => { if (byId[id]) stack.appendChild(byId[id]); });
+}
+
+function wireCardDragging(){
+  const stack = el('cardStack');
+  let dragEl = null, placeholder = null, startY = 0, startTop = 0;
+
+  function onPointerMove(e){
+    if (!dragEl) return;
+    dragEl.style.top = (startTop + (e.clientY - startY)) + 'px';
+    const dragRect = dragEl.getBoundingClientRect();
+    const dragCenter = dragRect.top + dragRect.height/2;
+    const siblings = [...stack.children].filter(c => c!==dragEl && c!==placeholder && !c.classList.contains('hidden'));
+    const target = siblings.find(sib => dragCenter < sib.getBoundingClientRect().top + sib.getBoundingClientRect().height/2);
+    if (target) stack.insertBefore(placeholder, target);
+    else stack.appendChild(placeholder);
+  }
+
+  function onPointerUp(){
+    window.removeEventListener('pointermove', onPointerMove);
+    if (!dragEl) return;
+    stack.insertBefore(dragEl, placeholder);
+    placeholder.remove();
+    dragEl.style.position = ''; dragEl.style.left = ''; dragEl.style.top = ''; dragEl.style.width = '';
+    dragEl.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    saveCardOrder();
+    dragEl = null; placeholder = null;
+  }
+
+  stack.addEventListener('pointerdown', e => {
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    const card = handle.closest('.card');
+    if (!card) return;
+    e.preventDefault();
+    const rect = card.getBoundingClientRect();
+    dragEl = card; startY = e.clientY; startTop = rect.top;
+    placeholder = document.createElement('div');
+    placeholder.className = 'card drag-placeholder';
+    placeholder.style.height = rect.height + 'px';
+    card.parentNode.insertBefore(placeholder, card.nextSibling);
+    Object.assign(card.style, { position:'fixed', left:rect.left+'px', width:rect.width+'px', top:rect.top+'px' });
+    card.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp, { once:true });
+  });
+}
+
 function wireEvents(){
   renderQuickLocs();
 
@@ -1467,6 +1660,8 @@ function wireEvents(){
 
 async function init(){
   wireEvents();
+  applyCardOrder();
+  wireCardDragging();
   setStatus('Detecting your location…');
   try{
     const { lat, lon } = await getGPS(8000);
